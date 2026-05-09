@@ -1,5 +1,6 @@
-"use client";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { getUserLocation, formatPrice, CURRENCY_MAPPING } from "@/utils/currency";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -141,6 +142,21 @@ export default function TechreviveWithAdmin() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [newAddress, setNewAddress] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currencyData, setCurrencyData] = useState({ code: "USD", symbol: "$", rate: 1 });
+
+  useEffect(() => {
+    const detectLocation = async () => {
+      const location = await getUserLocation();
+      const mapping = CURRENCY_MAPPING[location.country] || CURRENCY_MAPPING["US"];
+      setCurrencyData(mapping);
+    };
+    detectLocation();
+  }, []);
+
+  const getDisplayPrice = (usdPrice: number) => {
+    return usdPrice * currencyData.rate;
+  };
+
   const updateQuantity = (id: number, change: number) => {
     setCartItems((items) =>
       items
@@ -2517,7 +2533,8 @@ export default function TechreviveWithAdmin() {
                                       <p className="text-xs text-white/40 line-clamp-2">{p.description}</p>
                                     </div>
                                     <div className="flex justify-between items-center mt-2">
-                                      <span className="text-green-400 font-bold">${p.price}</span>
+                                      <span className="text-green-400 font-bold">{formatPrice(p.price, "USD")}</span>
+
                                       <Button 
                                         size="sm" 
                                         onClick={() => handleImportTrending(p)} 
