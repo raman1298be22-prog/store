@@ -154,16 +154,29 @@ export default function TechreviveWithAdmin() {
   useEffect(() => {
     const initializeCurrency = async () => {
       const rates = await fetchExchangeRates();
+      const location = await getUserLocation();
+      const detectedCountry = location.country;
+      console.log('Detected location:', location, 'Country code:', detectedCountry);
+
       const savedCurrency = localStorage.getItem("selectedCurrency");
-      let countryCode = "US";
-      if (savedCurrency) {
-        countryCode = savedCurrency;
+      let countryCode = detectedCountry; // Always use detected location
+
+      // If we have a saved currency and it's different from detected, use detected
+      if (savedCurrency && savedCurrency !== detectedCountry) {
+        console.log('Saved currency', savedCurrency, 'differs from detected', detectedCountry, '- using detected');
+        localStorage.setItem("selectedCurrency", detectedCountry);
+      } else if (!savedCurrency) {
+        console.log('No saved currency, saving detected:', detectedCountry);
+        localStorage.setItem("selectedCurrency", detectedCountry);
       } else {
-        const location = await getUserLocation();
-        countryCode = location.country;
+        console.log('Using saved currency:', savedCurrency);
+        countryCode = savedCurrency;
       }
+
       const mapping = CURRENCY_MAPPING[countryCode] || CURRENCY_MAPPING["US"];
+      console.log('Currency mapping for', countryCode, ':', mapping);
       const rate = rates[mapping.code] || 1;
+      console.log('Exchange rate for', mapping.code, ':', rate);
       setCurrencyData({ ...mapping, rate });
       setSelectedCountry(countryCode);
 
@@ -182,8 +195,11 @@ export default function TechreviveWithAdmin() {
   const handleDetectLocation = async () => {
     const rates = await fetchExchangeRates();
     const location = await getUserLocation();
+    console.log('Manual location detection:', location);
     const mapping = CURRENCY_MAPPING[location.country] || CURRENCY_MAPPING["US"];
+    console.log('Manual currency mapping:', mapping);
     const rate = rates[mapping.code] || 1;
+    console.log('Manual exchange rate:', rate);
     setCurrencyData({ ...mapping, rate });
     setSelectedCountry(location.country);
     localStorage.setItem("selectedCurrency", location.country);

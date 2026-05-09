@@ -68,11 +68,16 @@ export const CURRENCY_MAPPING: Record<string, { code: string, symbol: string }> 
 let exchangeRates: Record<string, number> = {};
 
 export async function fetchExchangeRates() {
-  if (Object.keys(exchangeRates).length > 0) return exchangeRates; // Cache
+  if (Object.keys(exchangeRates).length > 0) {
+    console.log('Using cached exchange rates');
+    return exchangeRates; // Cache
+  }
   try {
+    console.log('Fetching exchange rates from API');
     const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
     const data = await response.json();
     exchangeRates = data.rates;
+    console.log('Fetched rates:', Object.keys(exchangeRates).length, 'currencies');
     return exchangeRates;
   } catch (error) {
     console.error("Failed to fetch exchange rates:", error);
@@ -124,6 +129,7 @@ export async function fetchExchangeRates() {
       LAK: 17000,
       MNT: 3400,
     };
+    console.log('Using fallback rates');
     return exchangeRates;
   }
 }
@@ -196,6 +202,7 @@ export async function getUserLocation() {
   try {
     const response = await fetch('/api/location');
     const data = await response.json();
+    console.log('Location API response:', data);
     return {
       country: data.country_code || "US",
       country_name: data.country_name || "United States"
