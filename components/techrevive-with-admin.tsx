@@ -17,7 +17,9 @@ import {
   TrendingUp,
   PlusIcon,
   PencilIcon,
-  Laptop,
+  ShieldCheck,
+  Truck,
+  RotateCcw,
 } from "lucide-react";
 import {
   Dialog,
@@ -81,9 +83,9 @@ import { auth as Auth } from "firebase-admin";
 import { log } from "console";
 const firebaseConfig = {
   apiKey: "AIzaSyDrG6tD6GPC7kCZ3CNXmAhc_X5wXd643-E",
-  authDomain: "laptop-shop-25c2c.firebaseapp.com",
-  projectId: "laptop-shop-25c2c",
-  storageBucket: "laptop-shop-25c2c.firebasestorage.app",
+  authDomain: "product-shop-25c2c.firebaseapp.com",
+  projectId: "product-shop-25c2c",
+  storageBucket: "product-shop-25c2c.firebasestorage.app",
   messagingSenderId: "209150941153",
   appId: "1:209150941153:web:0f6bd22df7e37b5fffa4a0",
   measurementId: "G-0S28KCF6LV",
@@ -106,30 +108,35 @@ type Order = {
   address: string;
   customerEmail?: string; // Add this line and make it optional with ?
 };
-type Laptop = {
+type Product = {
   firb_id: string;
   id: any;
+  cj_product_id?: string;
   name: any;
   description: any;
+  cost_price?: number;
   price: any;
+  margin?: number;
   brand: any;
   image: any;
   stock: any;
   sold: any;
+  category?: string;
+  variants?: any[];
 };
 export default function TechreviveWithAdmin() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [currentPage, setCurrentPage] = useState("home");
-  const [laptops, setLaptops] = useState<Laptop[]>([]);
-  const [editingLaptop, setEditingLaptop] = useState<Laptop | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isAdminDialogOpen, setIsAdminDialogOpen] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [quickViewLaptop, setQuickViewLaptop] = useState<Laptop | null>(null);
-  const [originalLaptops, setOriginalLaptops] = useState<Laptop[]>(laptops);
+  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
+  const [originalProducts, setOriginalProducts] = useState<Product[]>(products);
   const [error, setError] = useState<string | null>(null);
-  const [filteredLaptops, setFilteredLaptops] = useState<Laptop[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [isEditAddressDialogOpen, setIsEditAddressDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [newAddress, setNewAddress] = useState("");
@@ -167,11 +174,11 @@ export default function TechreviveWithAdmin() {
     return () => unsubscribe();
   }, []);
   useEffect(() => {
-    const fetchLaptops = async () => {
+    const fetchProducts = async () => {
       try {
-        const laptopsCollection = collection(db, "laptops"); // Replace "laptops" with your actual collection name
-        const laptopsSnapshot = await getDocs(laptopsCollection);
-        const laptopsList: Laptop[] = laptopsSnapshot.docs.map((doc) => {
+        const productsCollection = collection(db, "products"); // Replace "products" with your actual collection name
+        const productsSnapshot = await getDocs(productsCollection);
+        const productsList: Product[] = productsSnapshot.docs.map((doc) => {
           const data = doc.data();
           return {
             firb_id: doc.id,
@@ -183,41 +190,45 @@ export default function TechreviveWithAdmin() {
             image: data.image,
             stock: data.stock,
             sold: data.sold,
+            cost_price: data.cost_price,
+            margin: data.margin,
+            category: data.category,
+            cj_product_id: data.cj_product_id,
           };
         });
-        setLaptops(laptopsList);
-        setFilteredLaptops(laptopsList);
-        setOriginalLaptops(laptopsList);
+        setProducts(productsList);
+        setFilteredProducts(productsList);
+        setOriginalProducts(productsList);
       } catch (error) {
-        console.error("Error fetching laptops:", error);
+        console.error("Error fetching products:", error);
       }
     };
 
-    fetchLaptops();
+    fetchProducts();
   }, []);
   const totalPrice = cartItems.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
   );
-  const addToCart = (laptop: Laptop) => {
-    const existingItem = cartItems.find((item) => item.id === laptop.id);
+  const addToCart = (product: Product) => {
+    const existingItem = cartItems.find((item) => item.id === product.id);
     if (existingItem) {
-      updateQuantity(laptop.id, 1);
+      updateQuantity(product.id, 1);
     } else {
       setCartItems([
         ...cartItems,
-        { id: laptop.id, name: laptop.name, price: laptop.price, quantity: 1 },
+        { id: product.id, name: product.name, price: product.price, quantity: 1 },
       ]);
     }
   };
   const getTotalRevenue = () => {
-    return laptops.reduce((sum, laptop) => sum + laptop.price * laptop.sold, 0);
+    return products.reduce((sum, product) => sum + product.price * product.sold, 0);
   };
   const getTotalSold = () => {
-    return laptops.reduce((sum, laptop) => sum + laptop.sold, 0);
+    return products.reduce((sum, product) => sum + product.sold, 0);
   };
   const getTotalStock = () => {
-    return laptops.reduce((sum, laptop) => sum + laptop.stock, 0);
+    return products.reduce((sum, product) => sum + product.stock, 0);
   };
   const updateOrderStatus = async (
     orderId: string,
@@ -314,27 +325,27 @@ export default function TechreviveWithAdmin() {
           });
 
           // Add user to Firestore
-          const db = getFirestore();
           const userDocRef = doc(db, "users", userCredential.user.uid);
-          await setDoc(userDocRef, {
-            name: name,
-            email: email,
-            phone: phone,
-            role: "user",
-            createdAt: new Date(),
-          });
+          try {
+            await setDoc(userDocRef, {
+              name: name,
+              email: email,
+              phone: phone,
+              role: "user",
+              createdAt: new Date(),
+            });
+            console.log("User added to Firestore successfully");
+          } catch (fsError: any) {
+            console.error("Firestore Error during signup:", fsError);
+            alert(`Database Error: ${fsError.message}`);
+          }
 
           const userWithRole = { ...userCredential.user, role: "user" };
           setCurrentUser(userWithRole);
           localStorage.setItem("user", JSON.stringify(userWithRole));
 
-          console.log(
-            "User signed up and added to Firestore successfully:",
-            userCredential.user
-          );
           setError(null);
-          setIsAuthOpen(false); // Close the auth dialog
-          // You can add additional logic here, such as updating UI or redirecting the user
+          setIsAuthOpen(false);
         }
       } catch (error) {
         console.error("Error signing up:", error);
@@ -360,18 +371,21 @@ export default function TechreviveWithAdmin() {
         const result = await firebaseSignInWithPopup(auth, provider);
         const user = result.user;
 
-        const db = getFirestore();
         const userDocRef = doc(db, "users", user.uid);
         const userDocSnapshot = await getDoc(userDocRef);
         
         let role = "user";
         if (!userDocSnapshot.exists()) {
-          await setDoc(userDocRef, {
-            name: user.displayName ?? "",
-            email: user.email ?? "",
-            role: "user",
-            createdAt: new Date(),
-          });
+          try {
+            await setDoc(userDocRef, {
+              name: user.displayName ?? "",
+              email: user.email ?? "",
+              role: "user",
+              createdAt: new Date(),
+            });
+          } catch (fsError: any) {
+            console.error("Firestore Error during Google signin:", fsError);
+          }
         } else {
           role = userDocSnapshot.data()?.role || "user";
         }
@@ -417,7 +431,6 @@ export default function TechreviveWithAdmin() {
         );
         const user = userCredential.user;
 
-        const db = getFirestore();
         const userDocRef = doc(db, "users", user.uid);
         const userDocSnapshot = await getDoc(userDocRef);
         const userData = userDocSnapshot.data();
@@ -450,7 +463,11 @@ export default function TechreviveWithAdmin() {
     }, []);
 
     return (
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-black/20 border-b border-white/10">
+      <>
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white text-center py-2 text-sm font-medium animate-pulse">
+          🚚 FREE SHIPPING NATIONWIDE - LIMITED TIME OFFER! 📦
+        </div>
+        <header className="sticky top-0 z-50 backdrop-blur-xl bg-black/40 border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button
@@ -463,9 +480,9 @@ export default function TechreviveWithAdmin() {
             </Button>
             <button
               onClick={() => setCurrentPage("home")}
-              className="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600"
+              className="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400"
             >
-              PERFECT COMPUTING
+              NEXUS MARKETPLACE
             </button>
           </div>
 
@@ -483,12 +500,12 @@ export default function TechreviveWithAdmin() {
               </button>
               <button
                 onClick={() => {
-                  setCurrentPage("laptops");
+                  setCurrentPage("products");
                   setMobileMenuOpen(false);
                 }}
                 className="block w-full text-left px-4 py-2 hover:bg-white/10 rounded"
               >
-                Laptops
+                Products
               </button>
               <button
                 onClick={() => {
@@ -541,10 +558,10 @@ export default function TechreviveWithAdmin() {
               Home
             </button>
             <button
-              onClick={() => setCurrentPage("laptops")}
+              onClick={() => setCurrentPage("products")}
               className="hover:text-blue-400 transition-colors"
             >
-              Laptops
+              Products
             </button>
             <button
               onClick={() => setCurrentPage("about")}
@@ -601,7 +618,7 @@ export default function TechreviveWithAdmin() {
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px] bg-black/80 backdrop-blur-xl text-white border border-white/20">
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
+                  <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
                     Your Cart
                   </DialogTitle>
                   <DialogDescription className="text-white/70">
@@ -654,7 +671,7 @@ export default function TechreviveWithAdmin() {
                   </span>
                 </div>
                 <Button
-                  className="w-full mt-4 bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
+                  className="w-full mt-4 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
                   onClick={() => {
                     const user = localStorage.getItem("user");
                     if (!user) {
@@ -703,7 +720,7 @@ export default function TechreviveWithAdmin() {
                     </TabsList>
                     <TabsContent value="login">
                       <DialogHeader>
-                        <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
+                        <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
                           Login
                         </DialogTitle>
                         <DialogDescription className="text-white/70">
@@ -759,7 +776,7 @@ export default function TechreviveWithAdmin() {
                           </Button>
                           <Button
                             type="submit"
-                            className="bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
+                            className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
                           >
                             Login
                           </Button>
@@ -819,7 +836,7 @@ export default function TechreviveWithAdmin() {
 
                     <TabsContent value="signup">
                       <DialogHeader>
-                        <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
+                        <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
                           Sign Up
                         </DialogTitle>
                         <DialogDescription className="text-white/70">
@@ -902,7 +919,7 @@ export default function TechreviveWithAdmin() {
                           </Button>
                           <Button
                             type="submit"
-                            className="bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
+                            className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
                           >
                             Sign Up
                           </Button>
@@ -968,7 +985,7 @@ export default function TechreviveWithAdmin() {
                           <img
                             src={currentUser.photoURL}
                             alt={currentUser.displayName || "User"}
-                            className="w-24 h-24 rounded-full border-4 border-gradient-to-r from-green-400 via-blue-500 to-purple-600 mb-4"
+                            className="w-24 h-24 rounded-full border-4 border-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 mb-4"
                           />
                           <Button
                             size="sm"
@@ -983,7 +1000,7 @@ export default function TechreviveWithAdmin() {
                         </div>
                       ) : (
                         <div className="relative">
-                          <div className="w-24 h-24 rounded-full bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold mb-4">
+                          <div className="w-24 h-24 rounded-full bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 flex items-center justify-center text-white text-3xl font-bold mb-4">
                             {currentUser?.displayName
                               ? currentUser.displayName[0].toUpperCase()
                               : "U"}
@@ -1000,7 +1017,7 @@ export default function TechreviveWithAdmin() {
                           </Button>
                         </div>
                       )}
-                      <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
+                      <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
                         Welcome, {currentUser?.displayName || "User"}!
                       </h2>
                     </div>
@@ -1029,7 +1046,7 @@ export default function TechreviveWithAdmin() {
                       </div>
                     </div>
                     <Button
-                      className="mt-8 w-full bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white py-3 rounded-lg transition duration-300 ease-in-out text-lg font-semibold"
+                      className="mt-8 w-full bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white py-3 rounded-lg transition duration-300 ease-in-out text-lg font-semibold"
                       onClick={() => {
                         localStorage.removeItem("user");
                         setCurrentUser(null);
@@ -1044,68 +1061,128 @@ export default function TechreviveWithAdmin() {
             </Dialog>
           </div>
         </div>
-      </header>
+        </header>
+      </>
     );
   };
   const Footer = () => (
-    <footer className="bg-black/40 backdrop-blur-md py-8 mt-12 border-t border-white/10">
-      <div className="container mx-auto px-4 text-center text-white/70">
-        <p>&copy; 2023 Perfect Computing. All rights reserved.</p>
+    <footer className="bg-black/60 backdrop-blur-md py-12 mt-20 border-t border-white/10">
+      <div className="container mx-auto px-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+          <div className="col-span-1 md:col-span-2">
+            <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 mb-4">
+              NEXUS MARKETPLACE
+            </h3>
+            <p className="text-white/60 max-w-sm">
+              Your one-stop shop for the trendiest gear. We source directly to bring you the best prices without compromising on quality.
+            </p>
+          </div>
+          <div>
+            <h4 className="text-white font-bold mb-4">Support</h4>
+            <ul className="text-white/40 space-y-2 text-sm cursor-pointer">
+              <li className="hover:text-indigo-400 transition-colors">Track Order</li>
+              <li className="hover:text-indigo-400 transition-colors">Shipping Policy</li>
+              <li className="hover:text-indigo-400 transition-colors">Refund Policy</li>
+              <li className="hover:text-indigo-400 transition-colors">Privacy Policy</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="text-white font-bold mb-4">Contact</h4>
+            <ul className="text-white/40 space-y-2 text-sm">
+              <li>support@nexusmarket.com</li>
+              <li>+91 93562-99921</li>
+            </ul>
+          </div>
+        </div>
+        <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+          <p className="text-white/40 text-sm">&copy; 2026 NEXUS MARKETPLACE. All rights reserved.</p>
+          <div className="flex items-center space-x-6 opacity-30 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-500">
+             <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" className="h-4" alt="Visa" />
+             <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" className="h-6" alt="Mastercard" />
+             <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" className="h-4" alt="PayPal" />
+             <img src="https://upload.wikimedia.org/wikipedia/commons/c/cb/Amex_logo_2006.svg" className="h-4" alt="Amex" />
+          </div>
+        </div>
       </div>
     </footer>
   );
   const QuickView = ({
-    laptop,
+    product,
     onClose,
   }: {
-    laptop: Laptop;
+    product: Product;
     onClose: () => void;
   }) => (
-    <Dialog open={!!laptop} onOpenChange={() => onClose()}>
+    <Dialog open={!!product} onOpenChange={() => onClose()}>
       <DialogContent className="sm:max-w-[625px] bg-black/80 backdrop-blur-xl text-white border border-white/20">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
-            {laptop.name}
+          <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+            {product.name}
           </DialogTitle>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-4">
           <div>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={laptop.image}
-              alt={laptop.name}
+              src={product.image}
+              alt={product.name}
               className="w-full h-auto rounded-lg"
             />
           </div>
           <div className="space-y-4">
-            <p className="text-white/80">{laptop.description}</p>
-            <p className="text-xl font-bold text-green-400">
-              ${laptop.price.toFixed(2)}
-            </p>
-            <p className="text-white/80">Brand: {laptop.brand}</p>
-            <p className="text-white/80">In Stock: {laptop.stock}</p>
-            <p className="text-white/80">Sold: {laptop.sold}</p>
+            <div className="bg-pink-500/10 border border-pink-500/20 rounded p-2 text-xs text-pink-400 font-bold animate-pulse">
+              🔥 Selling fast! 12 items left in stock.
+            </div>
+            <p className="text-white/80">{product.description}</p>
+            <div className="flex items-baseline space-x-2">
+              <p className="text-2xl font-bold text-green-400">
+                ₹{product.price.toFixed(2)}
+              </p>
+              <p className="text-sm text-white/40 line-through">
+                ₹{(product.price * 1.5).toFixed(2)}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <p className="text-white/60">Brand: <span className="text-white font-medium">{product.brand}</span></p>
+              <p className="text-white/60">Sold: <span className="text-white font-medium">{product.sold}</span></p>
+            </div>
+            
             <Button
-              className="w-full bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
-              onClick={() => addToCart(laptop)}
+              className="w-full bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white h-12 text-lg font-bold shadow-[0_0_20px_rgba(168,85,247,0.4)]"
+              onClick={() => addToCart(product)}
             >
-              Add to Cart
+              ADD TO CART
             </Button>
+
+            <div className="flex items-center justify-between pt-4 border-t border-white/10">
+               <div className="flex flex-col items-center">
+                 <ShieldCheck className="h-5 w-5 text-indigo-400 mb-1" />
+                 <span className="text-[10px] text-white/60 text-center">Secure<br/>Checkout</span>
+               </div>
+               <div className="flex flex-col items-center">
+                 <Truck className="h-5 w-5 text-indigo-400 mb-1" />
+                 <span className="text-[10px] text-white/60 text-center">Fast<br/>Shipping</span>
+               </div>
+               <div className="flex flex-col items-center">
+                 <RotateCcw className="h-5 w-5 text-indigo-400 mb-1" />
+                 <span className="text-[10px] text-white/60 text-center">30-Day<br/>Returns</span>
+               </div>
+            </div>
           </div>
         </div>
       </DialogContent>
     </Dialog>
   );
   const HomePage = () => {
-    const [searchLaptop, setSearchLaptop] = useState("");
+    const [searchProduct, setSearchProduct] = useState("");
 
-    const handleSearchLaptop = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setSearchLaptop(e.target.value);
+    const handleSearchProduct = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchProduct(e.target.value);
       const lowercaseQuery = e.target.value.toLowerCase().trim();
 
-      const filterLaptop = originalLaptops.filter((laptop) => {
-        const name = laptop.name.toLowerCase();
-        const description = laptop.description.toLowerCase();
+      const filterProduct = originalProducts.filter((product) => {
+        const name = product.name.toLowerCase();
+        const description = product.description.toLowerCase();
         return (
           name.includes(lowercaseQuery) || description.includes(lowercaseQuery)
         );
@@ -1114,75 +1191,79 @@ export default function TechreviveWithAdmin() {
 
     // Search button handler
     const handleSearchButton = () => {
-      if (searchLaptop !== "") {
-        const query = searchLaptop.toLowerCase();
+      if (searchProduct !== "") {
+        const query = searchProduct.toLowerCase();
 
         // Filter the original list instead of the already filtered one
-        const filteredLaptops = originalLaptops.filter((laptop) => {
-          const name = laptop.name.toLowerCase();
-          const description = laptop.description.toLowerCase();
+        const filteredProducts = originalProducts.filter((product) => {
+          const name = product.name.toLowerCase();
+          const description = product.description.toLowerCase();
           return name.includes(query) || description.includes(query);
         });
 
-        setLaptops(filteredLaptops); // Update the filtered list
+        setProducts(filteredProducts); // Update the filtered list
       } else {
-        setLaptops(originalLaptops); // Reset to original list if input is empty
+        setProducts(originalProducts); // Reset to original list if input is empty
       }
     };
 
     // Clear button handler
     const handleClearSearchButton = () => {
-      setSearchLaptop(""); // Reset the search query
-      setLaptops(originalLaptops); // Reset to original list
+      setSearchProduct(""); // Reset the search query
+      setProducts(originalProducts); // Reset to original list
     };
 
     return (
       <>
-        <section className="py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-green-500/20 via-blue-500/20 to-purple-500/20 animate-pulse"></div>
+        <section className="py-24 relative overflow-hidden flex items-center justify-center min-h-[70vh]">
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 via-purple-500/20 to-pink-500/20 animate-pulse"></div>
           <div className="container mx-auto px-4 text-center relative z-10">
-            <h2 className="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
-              Revive Your Tech Journey
+            <div className="inline-block px-4 py-1.5 mb-6 text-sm font-semibold tracking-wider text-indigo-400 uppercase bg-indigo-500/10 border border-indigo-500/20 rounded-full">
+              Trusted by 50,000+ Customers
+            </div>
+            <h2 className="text-6xl md:text-7xl font-extrabold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 leading-tight">
+              Premium Gear. <br/> Direct To You.
             </h2>
-            <p className="text-xl text-white/80 mb-8">
-              Discover quality second-hand laptops at unbeatable prices
+            <p className="text-xl text-white/70 mb-10 max-w-2xl mx-auto leading-relaxed">
+              Discover the latest trending products at wholesale prices. 
+              High quality, fast shipping, and 24/7 support.
             </p>
             <div className="flex justify-center">
               <Input
                 className="max-w-sm mr-2 bg-white/10 border-white/20 text-white placeholder-white/50"
-                placeholder="Search for laptops..."
-                value={searchLaptop}
-                onChange={handleSearchLaptop}
+                placeholder="Search for products..."
+                value={searchProduct}
+                onChange={handleSearchProduct}
               />
 
               <Button
-                className="bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
+                className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
                 onClick={
-                  searchLaptop ? handleSearchButton : handleClearSearchButton
+                  searchProduct ? handleSearchButton : handleClearSearchButton
                 }
               >
-                {searchLaptop ? "Search" : "Clear"}
+                {searchProduct ? "Search" : "Clear"}
               </Button>
             </div>
           </div>
         </section>
         <section className="py-12">
           <div className="container mx-auto px-4">
-            <h3 className="text-2xl font-semibold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
-              Featured Laptops
+            <h3 className="text-2xl font-semibold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+              Featured Products
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-              {laptops.map((laptop) => {
+              {products.map((product) => {
                 return (
                   <div
-                    key={laptop.id}
+                    key={product.id}
                     className="bg-black/40 backdrop-blur-md rounded-lg overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/30 group"
                   >
                     <div className="relative overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={laptop.image}
-                        alt={laptop.name}
+                        src={product.image}
+                        alt={product.name}
                         width={500}
                         height={300}
                         className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-110"
@@ -1192,26 +1273,38 @@ export default function TechreviveWithAdmin() {
                           variant="secondary"
                           size="sm"
                           className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm"
-                          onClick={() => setQuickViewLaptop(laptop)}
+                          onClick={() => setQuickViewProduct(product)}
                         >
                           Quick View
                         </Button>
                       </div>
                     </div>
                     <div className="p-4">
-                      <h4 className="font-semibold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
-                        {laptop.name}
-                      </h4>
-                      <p className="text-white/70 mb-4">{laptop.description}</p>
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+                          {product.name}
+                        </h4>
+                        <div className="flex flex-col items-end">
+                          <span className="text-xs text-white/40 line-through">₹{(product.price * 1.5).toFixed(2)}</span>
+                          <span className="text-xs font-bold text-pink-500">-33% OFF</span>
+                        </div>
+                      </div>
+                      <p className="text-white/60 text-sm mb-4 line-clamp-2">{product.description}</p>
+                      <div className="flex items-center space-x-2 mb-4">
+                        <div className="flex text-yellow-400">
+                          {"★★★★★".split("").map((s, i) => <span key={i} className="text-xs">{s}</span>)}
+                        </div>
+                        <span className="text-[10px] text-white/40">(124 Reviews)</span>
+                      </div>
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-green-400">
-                          ₹{laptop.price ? laptop.price.toFixed(2) : "N/A"}
+                          ₹{product.price ? product.price.toFixed(2) : "N/A"}
                         </span>
                         <Button
                           variant="secondary"
                           size="sm"
-                          className="bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
-                          onClick={() => addToCart(laptop)}
+                          className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
+                          onClick={() => addToCart(product)}
                         >
                           Add to Cart
                         </Button>
@@ -1223,28 +1316,28 @@ export default function TechreviveWithAdmin() {
             </div>
           </div>
         </section>
-        {quickViewLaptop && (
+        {quickViewProduct && (
           <QuickView
-            laptop={quickViewLaptop}
-            onClose={() => setQuickViewLaptop(null)}
+            product={quickViewProduct}
+            onClose={() => setQuickViewProduct(null)}
           />
         )}
       </>
     );
   };
-  const LaptopsPage = () => {
-    const [searchLaptop, setSearchLaptop] = useState("");
+  const ProductsPage = () => {
+    const [searchProduct, setSearchProduct] = useState("");
     const [selectedBrand, setSelectedBrand] = useState("all");
     const [selectedPriceRange, setSelectedPriceRange] = useState("all");
-    const [filteredLaptops, setFilteredLaptops] = useState<Laptop[]>([]);
+    const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
 
-    const handleSearchLaptop = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setSearchLaptop(e.target.value);
+    const handleSearchProduct = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchProduct(e.target.value);
       const lowercaseQuery = e.target.value.toLowerCase().trim();
 
-      const filterLaptop = originalLaptops.filter((laptop) => {
-        const name = laptop.name.toLowerCase();
-        const description = laptop.description.toLowerCase();
+      const filterProduct = originalProducts.filter((product) => {
+        const name = product.name.toLowerCase();
+        const description = product.description.toLowerCase();
         return (
           name.includes(lowercaseQuery) || description.includes(lowercaseQuery)
         );
@@ -1253,40 +1346,40 @@ export default function TechreviveWithAdmin() {
 
     // Search button handler
     const handleSearchButton = () => {
-      if (searchLaptop !== "") {
-        const query = searchLaptop.toLowerCase();
+      if (searchProduct !== "") {
+        const query = searchProduct.toLowerCase();
 
         // Filter the original list instead of the already filtered one
-        const filteredLaptops = originalLaptops.filter((laptop) => {
-          const name = laptop.name.toLowerCase();
-          const description = laptop.description.toLowerCase();
+        const filteredProducts = originalProducts.filter((product) => {
+          const name = product.name.toLowerCase();
+          const description = product.description.toLowerCase();
           return name.includes(query) || description.includes(query);
         });
 
-        setLaptops(filteredLaptops); // Update the filtered list
+        setProducts(filteredProducts); // Update the filtered list
       } else {
-        setLaptops(originalLaptops); // Reset to original list if input is empty
+        setProducts(originalProducts); // Reset to original list if input is empty
       }
     };
 
     // Clear button handler
     const handleClearButton = () => {
-      setSearchLaptop(""); // Reset the search query
-      setLaptops(originalLaptops); // Reset to original list
+      setSearchProduct(""); // Reset the search query
+      setProducts(originalProducts); // Reset to original list
     };
 
     useEffect(() => {
-      let filtered = originalLaptops;
+      let filtered = originalProducts;
 
       if (selectedBrand !== "all") {
         filtered = filtered.filter(
-          (laptop) => selectedBrand.toLowerCase() === laptop.brand.toLowerCase()
+          (product) => selectedBrand.toLowerCase() === product.brand.toLowerCase()
         );
       }
 
       if (selectedPriceRange !== "all") {
-        filtered = filtered.filter((laptop) => {
-          const price = laptop.price || 0;
+        filtered = filtered.filter((product) => {
+          const price = product.price || 0;
           if (selectedPriceRange === "0-50000")
             return price >= 0 && price <= 50000;
           if (selectedPriceRange === "50000-100000")
@@ -1296,8 +1389,8 @@ export default function TechreviveWithAdmin() {
         });
       }
 
-      setFilteredLaptops(filtered);
-    }, [selectedBrand, selectedPriceRange, originalLaptops]);
+      setFilteredProducts(filtered);
+    }, [selectedBrand, selectedPriceRange, originalProducts]);
 
     const handleBrandChange = (value: string) => {
       setSelectedBrand(value);
@@ -1309,22 +1402,22 @@ export default function TechreviveWithAdmin() {
 
     return (
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
-          Our Laptops
+        <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+          Our Products
         </h1>
         <div className="flex flex-col md:flex-row justify-between items-center mb-8">
           <div className="flex mb-4 md:mb-0">
             <Input
               className="max-w-sm mr-2 bg-white/10 border-white/20 text-white placeholder-white/50"
-              placeholder="Search laptops..."
-              value={searchLaptop}
-              onChange={handleSearchLaptop}
+              placeholder="Search products..."
+              value={searchProduct}
+              onChange={handleSearchProduct}
             />
             <Button
-              className="bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
-              onClick={searchLaptop ? handleSearchButton : handleClearButton}
+              className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
+              onClick={searchProduct ? handleSearchButton : handleClearButton}
             >
-              {searchLaptop ? "Search" : "Clear"}
+              {searchProduct ? "Search" : "Clear"}
             </Button>
           </div>
           <div className="flex space-x-2">
@@ -1358,15 +1451,15 @@ export default function TechreviveWithAdmin() {
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {filteredLaptops.map((laptop) => (
+          {filteredProducts.map((product) => (
             <div
-              key={laptop.id}
+              key={product.id}
               className="bg-black/40 backdrop-blur-md rounded-lg overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/30 group"
             >
               <div className="relative overflow-hidden">
                 <img
-                  src={laptop.image}
-                  alt={laptop.name}
+                  src={product.image}
+                  alt={product.name}
                   width={500}
                   height={300}
                   className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-110"
@@ -1376,26 +1469,38 @@ export default function TechreviveWithAdmin() {
                     variant="secondary"
                     size="sm"
                     className="bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm"
-                    onClick={() => setQuickViewLaptop(laptop)}
+                    onClick={() => setQuickViewProduct(product)}
                   >
                     Quick View
                   </Button>
                 </div>
               </div>
               <div className="p-4">
-                <h4 className="font-semibold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
-                  {laptop.name}
-                </h4>
-                <p className="text-white/70 mb-4">{laptop.description}</p>
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+                    {product.name}
+                  </h4>
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs text-white/40 line-through">₹{(product.price * 1.5).toFixed(2)}</span>
+                    <span className="text-xs font-bold text-pink-500">-33% OFF</span>
+                  </div>
+                </div>
+                <p className="text-white/60 text-sm mb-4 line-clamp-2">{product.description}</p>
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="flex text-yellow-400">
+                    {"★★★★★".split("").map((s, i) => <span key={i} className="text-xs">{s}</span>)}
+                  </div>
+                  <span className="text-[10px] text-white/40">(124 Reviews)</span>
+                </div>
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-bold text-green-400">
-                    ₹{laptop.price ? laptop.price.toFixed(2) : "N/A"}
+                    ₹{product.price ? product.price.toFixed(2) : "N/A"}
                   </span>
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
-                    onClick={() => addToCart(laptop)}
+                    className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
+                    onClick={() => addToCart(product)}
                   >
                     Add to Cart
                   </Button>
@@ -1404,10 +1509,10 @@ export default function TechreviveWithAdmin() {
             </div>
           ))}
         </div>
-        {quickViewLaptop && (
+        {quickViewProduct && (
           <QuickView
-            laptop={quickViewLaptop}
-            onClose={() => setQuickViewLaptop(null)}
+            product={quickViewProduct}
+            onClose={() => setQuickViewProduct(null)}
           />
         )}
       </div>
@@ -1415,32 +1520,32 @@ export default function TechreviveWithAdmin() {
   };
   const AboutPage = () => (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
-        About PERFECT COMPUTING
+      <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+        About NEXUS MARKETPLACE
       </h1>
       <div className="grid md:grid-cols-2 gap-8 items-center">
         <div>
           <p className="text-white/80 mb-4">
-            PERFECT COMPUTING is on a mission to make quality technology
+            NEXUS MARKETPLACE is on a mission to make quality technology
             accessible to everyone while promoting sustainability in the tech
             industry. We believe that great technology doesn&apos;t always have
             to be brand new or come with a hefty price tag.
           </p>
           <p className="text-white/80 mb-4">
             Our team of expert technicians carefully inspect, refurbish, and
-            certify each laptop we sell, ensuring that you receive a
+            certify each product we sell, ensuring that you receive a
             high-quality device that meets our rigorous standards. By choosing a
-            refurbished laptop, you&apos;re not only saving money but also
+            refurbished product, you&apos;re not only saving money but also
             contributing to the reduction of electronic waste.
           </p>
           <p className="text-white/80 mb-4">
             At TechRevive, we&apos;re committed to providing exceptional
             customer service, competitive prices, and a wide selection of
-            laptops to suit every need and budget. Join us in our journey to
+            products to suit every need and budget. Join us in our journey to
             revive technology and make a positive impact on both your wallet and
             the environment.
           </p>
-          <Button className="bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white">
+          <Button className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white">
             Learn More About Our Process
           </Button>
         </div>
@@ -1458,7 +1563,7 @@ export default function TechreviveWithAdmin() {
   );
   const ContactPage = () => (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
+      <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
         Contact Us
       </h1>
       <div className="grid md:grid-cols-2 gap-8">
@@ -1470,7 +1575,7 @@ export default function TechreviveWithAdmin() {
           </p>
           <div className="space-y-4">
             <div>
-              <h2 className="text-xl font-semibold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
+              <h2 className="text-xl font-semibold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
                 Our Location
               </h2>
               <p className="text-white/80">
@@ -1478,14 +1583,14 @@ export default function TechreviveWithAdmin() {
               </p>
             </div>
             <div>
-              <h2 className="text-xl font-semibold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
+              <h2 className="text-xl font-semibold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
                 Phone
               </h2>
               <p className="text-white/80">+91 0172-4416073</p>
               <p className="text-white/80">+91 93562-99921</p>
             </div>
             <div>
-              <h2 className="text-xl font-semibold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
+              <h2 className="text-xl font-semibold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
                 Email
               </h2>
               <p className="text-white/80">perfectcomputing@hotmail.com</p>
@@ -1518,7 +1623,7 @@ export default function TechreviveWithAdmin() {
             </div>
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
+              className="w-full bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
             >
               Send Message
             </Button>
@@ -1599,32 +1704,32 @@ export default function TechreviveWithAdmin() {
         // Update stock and sold counts
         await Promise.all(
           cartItems.map(async (item) => {
-            const laptopRef = doc(db, "laptops", item.id.toString());
-            const laptopSnap = await getDoc(laptopRef);
+            const productRef = doc(db, "products", item.id.toString());
+            const productSnap = await getDoc(productRef);
 
-            if (laptopSnap.exists()) {
-              const laptopData = laptopSnap.data() as Laptop;
-              await updateDoc(laptopRef, {
-                stock: laptopData.stock - item.quantity,
-                sold: laptopData.sold + item.quantity,
+            if (productSnap.exists()) {
+              const productData = productSnap.data() as Product;
+              await updateDoc(productRef, {
+                stock: productData.stock - item.quantity,
+                sold: productData.sold + item.quantity,
               });
             }
           })
         );
 
-        // Update local state for laptops
-        const updatedLaptops = laptops.map((laptop) => {
-          const cartItem = cartItems.find((item) => item.id === laptop.id);
+        // Update local state for products
+        const updatedProducts = products.map((product) => {
+          const cartItem = cartItems.find((item) => item.id === product.id);
           if (cartItem) {
             return {
-              ...laptop,
-              stock: laptop.stock - cartItem.quantity,
-              sold: laptop.sold + cartItem.quantity,
+              ...product,
+              stock: product.stock - cartItem.quantity,
+              sold: product.sold + cartItem.quantity,
             };
           }
-          return laptop;
+          return product;
         });
-        setLaptops(updatedLaptops);
+        setProducts(updatedProducts);
       } catch (error) {
         console.error("Error adding order: ", error);
       }
@@ -1672,7 +1777,7 @@ export default function TechreviveWithAdmin() {
     }, []);
     return (
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
+        <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
           Checkout
         </h1>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1854,54 +1959,69 @@ export default function TechreviveWithAdmin() {
               </div>
             </div>
             <Button
-              onClick={handleSubmit} // Now correctly typed
-              className="w-full mt-6 bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
+              onClick={handleSubmit}
+              className="w-full mt-6 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white h-12 text-lg font-bold shadow-[0_0_20px_rgba(168,85,247,0.4)]"
             >
-              Place Order
+              COMPLETE PURCHASE
             </Button>
+            <div className="grid grid-cols-3 gap-4 mt-8 pt-6 border-t border-white/10">
+               <div className="flex flex-col items-center">
+                 <ShieldCheck className="h-6 w-6 text-indigo-400 mb-1" />
+                 <span className="text-[10px] text-white/40 text-center uppercase font-bold">Secure<br/>Payment</span>
+               </div>
+               <div className="flex flex-col items-center">
+                 <Truck className="h-6 w-6 text-indigo-400 mb-1" />
+                 <span className="text-[10px] text-white/40 text-center uppercase font-bold">Free<br/>Shipping</span>
+               </div>
+               <div className="flex flex-col items-center">
+                 <RotateCcw className="h-6 w-6 text-indigo-400 mb-1" />
+                 <span className="text-[10px] text-white/40 text-center uppercase font-bold">Easy<br/>Returns</span>
+               </div>
+            </div>
           </div>
         </div>
       </div>
     );
   };
   const AdminPage = () => {
-    const handleAddLaptop = async (e: React.FormEvent<HTMLFormElement>) => {
+    const handleAddProduct = async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       const form = e.currentTarget;
       const formData = new FormData(form);
-
-      const newLaptop: Laptop = {
-        id: laptops.length + 1,
-        name: formData.get("name") as string,
-        description: formData.get("description") as string,
-        price: parseFloat(formData.get("price") as string),
-        brand: formData.get("brand") as string,
-        image: formData.get("image") as string,
-        stock: parseInt(formData.get("stock") as string),
-        sold: 0,
-        firb_id: "",
-      };
+      const cjId = formData.get("cj_id") as string;
 
       try {
-        const docRef = await addDoc(collection(db, "laptops"), newLaptop);
-        console.log("Document written with ID: ", docRef.id);
-        setLaptops([...laptops, newLaptop]);
-        setIsAdminDialogOpen(false);
+        const res = await fetch('/api/cj/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cjProductId: cjId })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          const newProduct: Product = { ...data.product, firb_id: "", id: products.length + 1 };
+          const docRef = await addDoc(collection(db, "products"), newProduct);
+          setProducts([...products, { ...newProduct, firb_id: docRef.id }]);
+          setIsAdminDialogOpen(false);
+        } else {
+          console.error("Failed to scalp product from CJ:", data.error);
+          alert("Failed to scalp product from CJ Dropshipping.");
+        }
       } catch (error) {
-        console.error("Error adding document: ", error);
+        console.error("Error importing product: ", error);
       }
     };
 
-    const handleEditLaptop = (laptop: Laptop) => {
-      console.log(laptop);
-      setEditingLaptop(laptop);
+    const handleEditProduct = (product: Product) => {
+      console.log(product);
+      setEditingProduct(product);
       setIsAdminDialogOpen(true);
     };
 
-    const handleUpdateLaptop = async (e: React.FormEvent<HTMLFormElement>) => {
+    const handleUpdateProduct = async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       const formData = new FormData(e.currentTarget);
-      const updatedLaptop: Partial<Laptop> = {
+      const updatedProduct: Partial<Product> = {
         name: formData.get("name") as string,
         description: formData.get("description") as string,
         price: parseFloat(formData.get("price") as string),
@@ -1910,16 +2030,16 @@ export default function TechreviveWithAdmin() {
         stock: parseInt(formData.get("stock") as string),
       };
       try {
-        if (!editingLaptop) {
-          console.error("No laptop is being edited.");
+        if (!editingProduct) {
+          console.error("No product is being edited.");
           return;
         }
 
-        console.log(editingLaptop);
-        const laptopId = editingLaptop.firb_id;
+        console.log(editingProduct);
+        const productId = editingProduct.firb_id;
 
-        console.log(`Updating laptop with ID: ${laptopId}`);
-        const docRef = doc(db, "laptops", laptopId);
+        console.log(`Updating product with ID: ${productId}`);
+        const docRef = doc(db, "products", productId);
         const docSnap = await getDoc(docRef);
         if (!docSnap.exists()) {
           console.log(docSnap);
@@ -1928,36 +2048,89 @@ export default function TechreviveWithAdmin() {
           return;
         }
         console.log("Document exists:", docSnap.data());
-        await updateDoc(docRef, updatedLaptop);
+        await updateDoc(docRef, updatedProduct);
         console.log("Document updated successfully");
         // Update the local state
-        setLaptops(
-          laptops.map((laptop) =>
-            laptop.id === editingLaptop.id
-              ? { ...laptop, ...updatedLaptop }
-              : laptop
+        setProducts(
+          products.map((product) =>
+            product.id === editingProduct.id
+              ? { ...product, ...updatedProduct }
+              : product
           )
         );
         setIsAdminDialogOpen(false);
-        setEditingLaptop(null);
+        setEditingProduct(null);
       } catch (error) {
         console.error("Error updating document: ", error);
       }
     };
 
-    const handleDeleteLaptop = async (laptop: Laptop) => {
-      console.log(laptop);
+    const [trendingProducts, setTrendingProducts] = useState<any[]>([]);
+    const [isTrendingLoading, setIsTrendingLoading] = useState(false);
+    const [isTrendingDialogOpen, setIsTrendingDialogOpen] = useState(false);
+    const [importingProductId, setImportingProductId] = useState<string | null>(null);
+
+    const fetchTrending = async () => {
+      setIsTrendingLoading(true);
+      setIsTrendingDialogOpen(true);
+      try {
+        const res = await fetch('/api/cj/trending');
+        const data = await res.json();
+        if (data.success) {
+          setTrendingProducts(data.products);
+        }
+      } catch (err) {
+        console.error("Error fetching trending:", err);
+      } finally {
+        setIsTrendingLoading(false);
+      }
+    };
+
+    const handleImportTrending = async (cjId: string) => {
+      setImportingProductId(cjId);
+      try {
+        const res = await fetch('/api/cj/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cjProductId: cjId })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          const newId = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
+          const newProduct: Product = { ...data.product, firb_id: "", id: newId };
+          const docRef = await addDoc(collection(db, "products"), newProduct);
+          const finalProduct = { ...newProduct, firb_id: docRef.id };
+          
+          setProducts(prev => [...prev, finalProduct]);
+          setFilteredProducts(prev => [...prev, finalProduct]);
+          setOriginalProducts(prev => [...prev, finalProduct]);
+          
+          alert(`Imported: ${data.product.name}`);
+        } else {
+          alert("Failed to scalp product data from CJ.");
+        }
+      } catch (error: any) {
+        console.error("Error importing trending product:", error);
+        alert(`Persistence Error: ${error.message || "Could not save to Firestore"}`);
+      } finally {
+        setImportingProductId(null);
+      }
+    };
+
+    const handleDeleteProduct = async (product: Product) => {
+      console.log(product);
 
       try {
-        if (!laptop) {
-          console.error("No laptop is being deleted.");
+        if (!product) {
+          console.error("No product is being deleted.");
           return;
         }
-        const laptopId = laptop.firb_id;
-        await deleteDoc(doc(db, "laptops", laptopId));
+        const productId = product.firb_id;
+        await deleteDoc(doc(db, "products", productId));
 
-        // Update the local state by filtering out the deleted laptop
-        setLaptops(laptops.filter((laptp) => laptp.id !== laptop.id));
+        // Update the local state by filtering out the deleted product
+        setProducts(products.filter((laptp) => laptp.id !== product.id));
 
         console.log("Document deleted successfully");
       } catch (error) {
@@ -1981,7 +2154,30 @@ export default function TechreviveWithAdmin() {
       }
     };
 
-    const [selectedTab, setSelectedTab] = useState("laptops");
+    const handleCJFulfill = async (order: Order) => {
+      if (order.status === 'forwarded_to_cj' || order.status === 'shipped' || order.status === 'delivered') {
+        alert("Order is already fulfilled or shipped.");
+        return;
+      }
+      try {
+        const res = await fetch('/api/cj/order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(order)
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(`Successfully forwarded to CJ Dropshipping! CJ Order ID: ${data.fulfillment.cj_order_id}`);
+          updateOrderStatus(order.id, 'forwarded_to_cj' as any);
+        } else {
+          alert("Failed to forward order to CJ Dropshipping.");
+        }
+      } catch (error) {
+        console.error("Error fulfilling order:", error);
+      }
+    };
+
+    const [selectedTab, setSelectedTab] = useState("products");
 
     const handleTabSwitch = (tabValue: string) => {
       // Function to update selectedTab on switch");
@@ -2013,7 +2209,7 @@ export default function TechreviveWithAdmin() {
     return (
       <>
         <div className="container mx-auto px-4 py-8">
-          <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
+          <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
             Admin Panel
           </h1>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -2031,7 +2227,7 @@ export default function TechreviveWithAdmin() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Laptops Sold
+                  Products Sold
                 </CardTitle>
                 <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
@@ -2054,10 +2250,10 @@ export default function TechreviveWithAdmin() {
           <Tabs defaultValue={selectedTab} className="space-y-4">
             <TabsList>
               <TabsTrigger
-                value="laptops"
-                onClick={() => handleTabSwitch("laptops")}
+                value="products"
+                onClick={() => handleTabSwitch("products")}
               >
-                Laptops
+                Products
               </TabsTrigger>
               <TabsTrigger
                 value="orders"
@@ -2066,16 +2262,213 @@ export default function TechreviveWithAdmin() {
                 Orders
               </TabsTrigger>
             </TabsList>
-            {selectedTab === "laptops" && (
-              <TabsContent value="laptops" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-semibold">Manage Laptops</h2>
-                  <Button
-                    onClick={() => setIsAdminDialogOpen(true)}
-                    className="bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
-                  >
-                    Add New Laptop
-                  </Button>
+            {selectedTab === "products" && (
+              <TabsContent value="products" className="space-y-4">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+                    Product Inventory
+                  </h2>
+                  <div className="flex space-x-2">
+                    <Button
+                      onClick={fetchTrending}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white border-none shadow-[0_0_15px_rgba(79,70,229,0.4)]"
+                    >
+                      <TrendingUp className="mr-2 h-4 w-4" />
+                      Scalp Trending
+                    </Button>
+                    <Dialog
+                      open={isAdminDialogOpen}
+                      onOpenChange={setIsAdminDialogOpen}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          onClick={() => setEditingProduct(null)}
+                          className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
+                        >
+                          <Plus className="mr-2 h-4 w-4" /> Add Product
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="bg-black/80 backdrop-blur-xl text-white border border-white/20">
+                        <DialogHeader>
+                          <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+                            {editingProduct ? "Edit Product" : "Scalp CJ Product"}
+                          </DialogTitle>
+                          <DialogDescription className="text-white/70">
+                            {editingProduct
+                              ? "Update the product details below."
+                              : "Enter a CJ Dropshipping Product ID to automatically scalp and import the product."}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form
+                          onSubmit={
+                            editingProduct
+                              ? handleUpdateProduct
+                              : handleAddProduct
+                          }
+                        >
+                          <div className="grid gap-4 py-4">
+                            {editingProduct ? (
+                              <>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="name" className="text-right">
+                                    Name
+                                  </Label>
+                                  <Input
+                                    id="name"
+                                    name="name"
+                                    defaultValue={editingProduct.name}
+                                    className="col-span-3 bg-white/10 border-white/20 text-white"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label
+                                    htmlFor="description"
+                                    className="text-right"
+                                  >
+                                    Description
+                                  </Label>
+                                  <Input
+                                    id="description"
+                                    name="description"
+                                    defaultValue={editingProduct.description}
+                                    className="col-span-3 bg-white/10 border-white/20 text-white"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="price" className="text-right">
+                                    Price
+                                  </Label>
+                                  <Input
+                                    id="price"
+                                    name="price"
+                                    type="number"
+                                    defaultValue={editingProduct.price}
+                                    className="col-span-3 bg-white/10 border-white/20 text-white"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="brand" className="text-right">
+                                    Brand
+                                  </Label>
+                                  <Input
+                                    id="brand"
+                                    name="brand"
+                                    defaultValue={editingProduct.brand}
+                                    className="col-span-3 bg-white/10 border-white/20 text-white"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="image" className="text-right">
+                                    Image URL
+                                  </Label>
+                                  <Input
+                                    id="image"
+                                    name="image"
+                                    defaultValue={editingProduct.image}
+                                    className="col-span-3 bg-white/10 border-white/20 text-white"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                  <Label htmlFor="stock" className="text-right">
+                                    Stock
+                                  </Label>
+                                  <Input
+                                    id="stock"
+                                    name="stock"
+                                    type="number"
+                                    defaultValue={editingProduct.stock}
+                                    className="col-span-3 bg-white/10 border-white/20 text-white"
+                                  />
+                                </div>
+                              </>
+                            ) : (
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="cj_id" className="text-right">
+                                  CJ ID
+                                </Label>
+                                <Input
+                                  id="cj_id"
+                                  name="cj_id"
+                                  placeholder="e.g. CJPL123456"
+                                  className="col-span-3 bg-white/10 border-white/20 text-white"
+                                  required
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex justify-end space-x-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => setIsAdminDialogOpen(false)}
+                              className="text-white hover:bg-white/10"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="submit"
+                              className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
+                            >
+                              {editingProduct ? "Update Product" : "Scalp & Import"}
+                            </Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Trending Products Dialog */}
+                    <Dialog open={isTrendingDialogOpen} onOpenChange={setIsTrendingDialogOpen}>
+                      <DialogContent className="max-w-4xl bg-black/90 backdrop-blur-2xl text-white border border-white/10 max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+                            Trending High-Sales Products
+                          </DialogTitle>
+                          <DialogDescription className="text-white/60">
+                            Discover the top-performing items on CJ Dropshipping right now.
+                          </DialogDescription>
+                        </DialogHeader>
+                        
+                        {isTrendingLoading ? (
+                          <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                            <p className="text-indigo-400 animate-pulse">Analyzing market trends...</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+                            {trendingProducts.map((p) => (
+                              <div key={p.cj_id} className="p-4 bg-white/5 border border-white/10 rounded-xl flex space-x-4 group hover:bg-white/10 transition-all">
+                                <img src={p.image} className="w-24 h-24 object-cover rounded-lg" alt={p.name} />
+                                <div className="flex-1 flex flex-col justify-between">
+                                  <div>
+                                    <h4 className="font-bold text-white mb-1 group-hover:text-indigo-400 transition-colors">{p.name}</h4>
+                                    <p className="text-xs text-white/40 line-clamp-2">{p.description}</p>
+                                  </div>
+                                  <div className="flex justify-between items-center mt-2">
+                                    <span className="text-green-400 font-bold">${p.price}</span>
+                                    <Button 
+                                      size="sm" 
+                                      onClick={() => handleImportTrending(p.cj_id)} 
+                                      disabled={importingProductId === p.cj_id}
+                                      className="bg-indigo-500 hover:bg-indigo-600 h-8 px-4 text-xs font-bold"
+                                    >
+                                      {importingProductId === p.cj_id ? (
+                                        <div className="flex items-center">
+                                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                                          Importing...
+                                        </div>
+                                      ) : (
+                                        "Import Now"
+                                      )}
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <Table>
@@ -2094,32 +2487,32 @@ export default function TechreviveWithAdmin() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {laptops
+                      {products
                         .sort((a, b) => a.id - b.id)
-                        .map((laptop) => (
-                          <TableRow key={laptop.id}>
-                            <TableCell>{laptop.id}</TableCell>
-                            <TableCell>{laptop.name}</TableCell>
-                            <TableCell>{laptop.description}</TableCell>
+                        .map((product) => (
+                          <TableRow key={product.id}>
+                            <TableCell>{product.id}</TableCell>
+                            <TableCell>{product.name}</TableCell>
+                            <TableCell>{product.description}</TableCell>
                             <TableCell>
                               {" "}
-                              {laptop.price ? laptop.price.toFixed(2) : "N/A"}
+                              {product.price ? product.price.toFixed(2) : "N/A"}
                             </TableCell>
-                            <TableCell>{laptop.brand}</TableCell>
-                            <TableCell>{laptop.stock}</TableCell>
-                            <TableCell>{laptop.sold}</TableCell>
+                            <TableCell>{product.brand}</TableCell>
+                            <TableCell>{product.stock}</TableCell>
+                            <TableCell>{product.sold}</TableCell>
                             <TableCell>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleEditLaptop(laptop)}
+                                onClick={() => handleEditProduct(product)}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDeleteLaptop(laptop)}
+                                onClick={() => handleDeleteProduct(product)}
                               >
                                 <Trash className="h-4 w-4" />
                               </Button>
@@ -2218,7 +2611,15 @@ export default function TechreviveWithAdmin() {
                             <TableCell>
                               {new Date(order.date).toLocaleDateString()}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="flex items-center space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="bg-indigo-500 hover:bg-indigo-600 text-white border-none"
+                                onClick={() => handleCJFulfill(order)}
+                              >
+                                Fulfill via CJ
+                              </Button>
                               <Select
                                 onValueChange={(value) =>
                                   updateOrderStatus(
@@ -2227,12 +2628,15 @@ export default function TechreviveWithAdmin() {
                                   )
                                 }
                               >
-                                <SelectTrigger className="w-[180px]">
-                                  <SelectValue placeholder="Update Status" />
+                                <SelectTrigger className="w-[130px]">
+                                  <SelectValue placeholder="Status" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="pending">
                                     Pending
+                                  </SelectItem>
+                                  <SelectItem value="forwarded_to_cj">
+                                    Forwarded
                                   </SelectItem>
                                   <SelectItem value="shipped">
                                     Shipped
@@ -2247,7 +2651,7 @@ export default function TechreviveWithAdmin() {
                                 size="sm"
                                 onClick={() => handleDeleteOrder(order)}
                               >
-                                <Trash className="h-4 w-4" />
+                                <Trash className="h-4 w-4 text-red-500" />
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -2269,83 +2673,98 @@ export default function TechreviveWithAdmin() {
           <Dialog open={isAdminDialogOpen} onOpenChange={setIsAdminDialogOpen}>
             <DialogContent className="sm:max-w-[425px] bg-black/80 backdrop-blur-xl text-white border border-white/20">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
-                  {editingLaptop ? "Edit Laptop" : "Add New Laptop"}
+                <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+                  {editingProduct ? "Edit Product" : "Add New Product"}
                 </DialogTitle>
               </DialogHeader>
               <form
-                onSubmit={editingLaptop ? handleUpdateLaptop : handleAddLaptop}
+                onSubmit={editingProduct ? handleUpdateProduct : handleAddProduct}
                 className="space-y-4"
               >
-                <div>
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    defaultValue={editingLaptop?.name}
-                    className="bg-white/10 border-white/20 text-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    defaultValue={editingLaptop?.description}
-                    className="bg-white/10 border-white/20 text-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="price">Price</Label>
-                  <Input
-                    id="price"
-                    name="price"
-                    type="number"
-                    step="0.01"
-                    defaultValue={editingLaptop?.price}
-                    className="bg-white/10 border-white/20 text-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="brand">Brand</Label>
-                  <Input
-                    id="brand"
-                    name="brand"
-                    defaultValue={editingLaptop?.brand}
-                    className="bg-white/10 border-white/20 text-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="stock">Stock</Label>
-                  <Input
-                    id="stock"
-                    name="stock"
-                    type="number"
-                    defaultValue={editingLaptop?.stock}
-                    className="bg-white/10 border-white/20 text-white"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="image">Image</Label>
-                  <Input
-                    id="image"
-                    name="image"
-                    type="string"
-                    defaultValue={editingLaptop?.image}
-                    className="bg-white/10 border-white/20 text-white"
-                    required
-                  />
-                </div>
+                {!editingProduct ? (
+                  <div>
+                    <Label htmlFor="cj_id">CJ Dropshipping Product ID</Label>
+                    <Input
+                      id="cj_id"
+                      name="cj_id"
+                      placeholder="e.g. 12345678"
+                      className="bg-white/10 border-white/20 text-white"
+                      required
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <Label htmlFor="name">Name</Label>
+                      <Input
+                        id="name"
+                        name="name"
+                        defaultValue={editingProduct?.name}
+                        className="bg-white/10 border-white/20 text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        name="description"
+                        defaultValue={editingProduct?.description}
+                        className="bg-white/10 border-white/20 text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="price">Retail Price</Label>
+                      <Input
+                        id="price"
+                        name="price"
+                        type="number"
+                        step="0.01"
+                        defaultValue={editingProduct?.price}
+                        className="bg-white/10 border-white/20 text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="brand">Brand</Label>
+                      <Input
+                        id="brand"
+                        name="brand"
+                        defaultValue={editingProduct?.brand}
+                        className="bg-white/10 border-white/20 text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="stock">Stock</Label>
+                      <Input
+                        id="stock"
+                        name="stock"
+                        type="number"
+                        defaultValue={editingProduct?.stock}
+                        className="bg-white/10 border-white/20 text-white"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="image">Image URL</Label>
+                      <Input
+                        id="image"
+                        name="image"
+                        type="text"
+                        defaultValue={editingProduct?.image}
+                        className="bg-white/10 border-white/20 text-white"
+                        required
+                      />
+                    </div>
+                  </>
+                )}
                 <Button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
+                  className="w-full bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)]"
                 >
-                  {editingLaptop ? "Update Laptop" : "Add Laptop"}
+                  {editingProduct ? "Update Product" : "Scalp CJ Product"}
                 </Button>
               </form>
             </DialogContent>
@@ -2440,7 +2859,7 @@ export default function TechreviveWithAdmin() {
 
     return (
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-600">
+        <h1 className="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
           My Orders
         </h1>
 
@@ -2557,18 +2976,26 @@ export default function TechreviveWithAdmin() {
   };
   const [userRole, setUserRole] = useState<string>("user");
   return (
-    <div className="bg-[#0a0a0f] text-white min-h-screen relative overflow-hidden">
-      <Header />
-      <main>
-        {currentPage === "home" && <HomePage />}
-        {currentPage === "laptops" && <LaptopsPage />}
-        {currentPage === "about" && <AboutPage />}
-        {currentPage === "contact" && <ContactPage />}
-        {currentPage === "checkout" && <CheckoutPage />}
-        {currentPage === "orders" && <OrdersPage />}
-        {currentPage === "admin" && <AdminPage />}
-      </main>
-      <Footer />
+    <div className="bg-black text-white min-h-screen relative overflow-hidden">
+      {/* 2026 Premium Glassmorphism Background Orbs */}
+      <div className="fixed inset-0 z-[0] pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-indigo-600/20 rounded-full mix-blend-screen filter blur-[150px] animate-pulse"></div>
+        <div className="absolute top-[20%] right-[-10%] w-[40vw] h-[40vw] bg-purple-600/20 rounded-full mix-blend-screen filter blur-[150px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute bottom-[-10%] left-[20%] w-[60vw] h-[60vw] bg-pink-600/10 rounded-full mix-blend-screen filter blur-[150px] animate-pulse" style={{ animationDelay: '4s' }}></div>
+      </div>
+      <div className="relative z-10">
+        <Header />
+        <main>
+          {currentPage === "home" && <HomePage />}
+          {currentPage === "products" && <ProductsPage />}
+          {currentPage === "about" && <AboutPage />}
+          {currentPage === "contact" && <ContactPage />}
+          {currentPage === "checkout" && <CheckoutPage />}
+          {currentPage === "orders" && <OrdersPage />}
+          {currentPage === "admin" && <AdminPage />}
+        </main>
+        <Footer />
+      </div>
     </div>
   );
 }
