@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { getUserLocation, formatPrice, CURRENCY_MAPPING } from "@/utils/currency";
+import { getUserLocation, formatPrice, CURRENCY_MAPPING, fetchExchangeRates } from "@/utils/currency";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,18 +143,49 @@ export default function TechreviveWithAdmin() {
   const [newAddress, setNewAddress] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currencyData, setCurrencyData] = useState({ code: "USD", symbol: "$", rate: 1 });
+  const [selectedCountry, setSelectedCountry] = useState("US");
 
   useEffect(() => {
-    const detectLocation = async () => {
-      const location = await getUserLocation();
-      const mapping = CURRENCY_MAPPING[location.country] || CURRENCY_MAPPING["US"];
-      setCurrencyData(mapping);
+    const initializeCurrency = async () => {
+      const rates = await fetchExchangeRates();
+      const savedCurrency = localStorage.getItem("selectedCurrency");
+      let countryCode = "US";
+      if (savedCurrency) {
+        countryCode = savedCurrency;
+      } else {
+        const location = await getUserLocation();
+        countryCode = location.country;
+      }
+      const mapping = CURRENCY_MAPPING[countryCode] || CURRENCY_MAPPING["US"];
+      const rate = rates[mapping.code] || 1;
+      setCurrencyData({ ...mapping, rate });
+      setSelectedCountry(countryCode);
     };
-    detectLocation();
+    initializeCurrency();
   }, []);
 
+  const handleDetectLocation = async () => {
+    const rates = await fetchExchangeRates();
+    const location = await getUserLocation();
+    const mapping = CURRENCY_MAPPING[location.country] || CURRENCY_MAPPING["US"];
+    const rate = rates[mapping.code] || 1;
+    setCurrencyData({ ...mapping, rate });
+    setSelectedCountry(location.country);
+    localStorage.setItem("selectedCurrency", location.country);
+  };
+
+  const handleCurrencyChange = async (countryCode: string) => {
+    const rates = await fetchExchangeRates();
+    const mapping = CURRENCY_MAPPING[countryCode] || CURRENCY_MAPPING["US"];
+    const rate = rates[mapping.code] || 1;
+    setCurrencyData({ ...mapping, rate });
+    setSelectedCountry(countryCode);
+    localStorage.setItem("selectedCurrency", countryCode);
+  };
+
   const getDisplayPrice = (usdPrice: number) => {
-    return usdPrice * currencyData.rate;
+    const convertedPrice = usdPrice * currencyData.rate;
+    return formatPrice(convertedPrice, currencyData.code);
   };
 
   const updateQuantity = (id: number, change: number) => {
@@ -609,6 +640,30 @@ export default function TechreviveWithAdmin() {
 
           {/* Cart and User Icons */}
           <div className="flex items-center space-x-2 md:space-x-4">
+            <Select
+              value={selectedCountry}
+              onValueChange={async (value) => {
+                if (value === "detect") {
+                  await handleDetectLocation();
+                } else {
+                  await handleCurrencyChange(value);
+                }
+              }}
+            >
+              <SelectTrigger className="w-32 bg-white/10 border-white/20 text-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="detect">
+                  🔍 Auto Detect
+                </SelectItem>
+                {Object.entries(CURRENCY_MAPPING).map(([country, data]) => (
+                  <SelectItem key={country} value={country}>
+                    {data.symbol} {data.code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="ghost"
               size="icon"
@@ -665,7 +720,7 @@ export default function TechreviveWithAdmin() {
                           <Plus className="h-4 w-4" />
                         </Button>
                         <span className="w-20 text-right">
-                          ${(item.price * item.quantity).toFixed(2)}
+                          {getDisplayPrice(item.price * item.quantity)}
                         </span>
                         <Button
                           size="sm"
@@ -683,7 +738,7 @@ export default function TechreviveWithAdmin() {
                 <div className="mt-6 flex justify-between items-center">
                   <span className="text-lg font-bold">Total:</span>
                   <span className="text-lg font-bold">
-                    ${totalPrice.toFixed(2)}
+                    {getDisplayPrice(totalPrice)}
                   </span>
                 </div>
                 <Button
@@ -1152,10 +1207,10 @@ export default function TechreviveWithAdmin() {
             <p className="text-white/80">{product.description}</p>
             <div className="flex items-baseline space-x-2">
               <p className="text-2xl font-bold text-green-400">
-                ${product.price.toFixed(2)}
+                {getDisplayPrice(product.price)}
               </p>
               <p className="text-sm text-white/40 line-through">
-                ${(product.price * 1.5).toFixed(2)}
+                {getDisplayPrice(product.price * 1.5)}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -1301,7 +1356,7 @@ export default function TechreviveWithAdmin() {
                           {product.name}
                         </h4>
                         <div className="flex flex-col items-end">
-                          <span className="text-xs text-white/40 line-through">${(product.price * 1.5).toFixed(2)}</span>
+                          <span className="text-xs text-white/40 line-through">{getDisplayPrice(product.price * 1.5)}</span>
                           <span className="text-xs font-bold text-pink-500">-33% OFF</span>
                         </div>
                       </div>
@@ -1314,7 +1369,7 @@ export default function TechreviveWithAdmin() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-green-400">
-                          ${product.price ? product.price.toFixed(2) : "N/A"}
+                          {getDisplayPrice(product.price)}
                         </span>
                         <Button
                           variant="secondary"
@@ -1497,7 +1552,7 @@ export default function TechreviveWithAdmin() {
                     {product.name}
                   </h4>
                   <div className="flex flex-col items-end">
-                    <span className="text-xs text-white/40 line-through">${(product.price * 1.5).toFixed(2)}</span>
+                    <span className="text-xs text-white/40 line-through">{getDisplayPrice(product.price * 1.5)}</span>
                     <span className="text-xs font-bold text-pink-500">-33% OFF</span>
                   </div>
                 </div>
@@ -1510,7 +1565,7 @@ export default function TechreviveWithAdmin() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-bold text-green-400">
-                    ${product.price ? product.price.toFixed(2) : "N/A"}
+                    {getDisplayPrice(product.price)}
                   </span>
                   <Button
                     variant="secondary"
@@ -1912,6 +1967,12 @@ export default function TechreviveWithAdmin() {
                       className="bg-white/10 border-white/20 text-white"
                     />
                   </div>
+                  {userData.location && (
+                    <div className="text-sm text-white/60">
+                      <Label>Detected Location</Label>
+                      <p className="mt-1">{userData.location}</p>
+                    </div>
+                  )}
                   <div>
                     <Label htmlFor="phone">Phone</Label>
                     <Input
@@ -1986,13 +2047,13 @@ export default function TechreviveWithAdmin() {
                   <span>
                     {item.name} x {item.quantity}
                   </span>
-                  <span>${(item.price * item.quantity).toFixed(2)}</span>
+                  <span>{getDisplayPrice(item.price * item.quantity)}</span>
                 </div>
               ))}
               <Separator />
               <div className="flex justify-between items-center font-bold">
                 <span>Total</span>
-                <span>${totalPrice.toFixed(2)}</span>
+                <span>{getDisplayPrice(totalPrice)}</span>
               </div>
             </div>
             <Button
@@ -2593,7 +2654,7 @@ export default function TechreviveWithAdmin() {
                             <TableCell>{product.description}</TableCell>
                             <TableCell>
                               {" "}
-                              {product.price ? product.price.toFixed(2) : "N/A"}
+                              {product.price ? getDisplayPrice(product.price) : "N/A"}
                             </TableCell>
                             <TableCell>{product.brand}</TableCell>
                             <TableCell>{product.stock}</TableCell>
