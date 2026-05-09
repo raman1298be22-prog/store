@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { getUserLocation, formatPrice, CURRENCY_MAPPING, fetchExchangeRates } from "@/utils/currency";
+import { getUserLocation, formatPrice, CURRENCY_MAPPING, fetchExchangeRates, getDetailedLocation } from "@/utils/currency";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,6 +144,12 @@ export default function TechreviveWithAdmin() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currencyData, setCurrencyData] = useState({ code: "USD", symbol: "$", rate: 1 });
   const [selectedCountry, setSelectedCountry] = useState("US");
+  const [locationDetails, setLocationDetails] = useState({
+    city: "",
+    state: "",
+    postalCode: "",
+    formatted: ""
+  });
 
   useEffect(() => {
     const initializeCurrency = async () => {
@@ -160,6 +166,15 @@ export default function TechreviveWithAdmin() {
       const rate = rates[mapping.code] || 1;
       setCurrencyData({ ...mapping, rate });
       setSelectedCountry(countryCode);
+
+      // Fetch detailed location for display
+      const details = await getDetailedLocation();
+      setLocationDetails({
+        city: details.city,
+        state: details.state,
+        postalCode: details.postalCode,
+        formatted: details.formatted
+      });
     };
     initializeCurrency();
   }, []);
@@ -172,6 +187,15 @@ export default function TechreviveWithAdmin() {
     setCurrencyData({ ...mapping, rate });
     setSelectedCountry(location.country);
     localStorage.setItem("selectedCurrency", location.country);
+
+    // Update location details
+    const details = await getDetailedLocation();
+    setLocationDetails({
+      city: details.city,
+      state: details.state,
+      postalCode: details.postalCode,
+      formatted: details.formatted
+    });
   };
 
   const handleCurrencyChange = async (countryCode: string) => {
@@ -514,6 +538,11 @@ export default function TechreviveWithAdmin() {
         <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white text-center py-2 text-sm font-medium animate-pulse">
           🚚 FREE SHIPPING NATIONWIDE - LIMITED TIME OFFER! 📦
         </div>
+        {locationDetails.formatted && (
+          <div className="bg-blue-600 text-white text-center py-1 text-xs">
+            📍 Your Location: {locationDetails.formatted} {locationDetails.postalCode && `(${locationDetails.postalCode})`}
+          </div>
+        )}
         <header className="sticky top-0 z-50 backdrop-blur-xl bg-black/40 border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">

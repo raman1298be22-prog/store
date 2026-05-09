@@ -128,7 +128,7 @@ export async function fetchExchangeRates() {
   }
 }
 
-export async function getUserLocation() {
+export async function getDetailedLocation() {
   // Try GPS-based location first
   if (navigator.geolocation) {
     try {
@@ -142,7 +142,7 @@ export async function getUserLocation() {
       
       const { latitude, longitude } = position.coords;
       
-      // Use reverse geocoding to get country
+      // Use reverse geocoding to get detailed location
       const response = await fetch(
         `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=1ae59703ee7c4de384485c912df09348`
       );
@@ -155,10 +155,13 @@ export async function getUserLocation() {
       const result = data.results[0];
       
       if (result) {
-        const countryCode = result.components.country_code?.toUpperCase() || "US";
+        const components = result.components;
         return {
-          country: countryCode,
-          currency: "USD" // Will be mapped later
+          country: components.country_code?.toUpperCase() || "US",
+          city: components.city || components.town || components.village || "",
+          state: components.state || components.province || "",
+          postalCode: components.postcode || "",
+          formatted: result.formatted || ""
         };
       }
     } catch (error) {
@@ -166,17 +169,43 @@ export async function getUserLocation() {
     }
   }
   
-  // Fallback to IP-based location
+  // Fallback to IP-based location (limited details)
   try {
     const response = await fetch('/api/location');
     const data = await response.json();
     return {
       country: data.country_code || "US",
-      currency: data.currency || "USD"
+      city: data.city || "",
+      state: data.region || "",
+      postalCode: "",
+      formatted: `${data.city || ""}, ${data.region || ""}, ${data.country_name || ""}`.replace(/^, |, $/, "")
     };
   } catch (error) {
     console.error("Failed to detect location:", error);
-    return { country: "US", currency: "USD" };
+    return {
+      country: "US",
+      city: "",
+      state: "",
+      postalCode: "",
+      formatted: ""
+    };
+  }
+}
+
+export async function getUserLocation() {
+  try {
+    const response = await fetch('/api/location');
+    const data = await response.json();
+    return {
+      country: data.country_code || "US",
+      country_name: data.country_name || "United States"
+    };
+  } catch (error) {
+    console.error("Failed to detect location:", error);
+    return {
+      country: "US",
+      country_name: "United States"
+    };
   }
 }
 
