@@ -649,7 +649,7 @@ export default function TechreviveWithAdmin() {
                           <Plus className="h-4 w-4" />
                         </Button>
                         <span className="w-20 text-right">
-                          ₹{(item.price * item.quantity).toFixed(2)}
+                          ${(item.price * item.quantity).toFixed(2)}
                         </span>
                         <Button
                           size="sm"
@@ -667,7 +667,7 @@ export default function TechreviveWithAdmin() {
                 <div className="mt-6 flex justify-between items-center">
                   <span className="text-lg font-bold">Total:</span>
                   <span className="text-lg font-bold">
-                    ₹{totalPrice.toFixed(2)}
+                    ${totalPrice.toFixed(2)}
                   </span>
                 </div>
                 <Button
@@ -1136,10 +1136,10 @@ export default function TechreviveWithAdmin() {
             <p className="text-white/80">{product.description}</p>
             <div className="flex items-baseline space-x-2">
               <p className="text-2xl font-bold text-green-400">
-                ₹{product.price.toFixed(2)}
+                ${product.price.toFixed(2)}
               </p>
               <p className="text-sm text-white/40 line-through">
-                ₹{(product.price * 1.5).toFixed(2)}
+                ${(product.price * 1.5).toFixed(2)}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -1285,7 +1285,7 @@ export default function TechreviveWithAdmin() {
                           {product.name}
                         </h4>
                         <div className="flex flex-col items-end">
-                          <span className="text-xs text-white/40 line-through">₹{(product.price * 1.5).toFixed(2)}</span>
+                          <span className="text-xs text-white/40 line-through">${(product.price * 1.5).toFixed(2)}</span>
                           <span className="text-xs font-bold text-pink-500">-33% OFF</span>
                         </div>
                       </div>
@@ -1298,7 +1298,7 @@ export default function TechreviveWithAdmin() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-green-400">
-                          ₹{product.price ? product.price.toFixed(2) : "N/A"}
+                          ${product.price ? product.price.toFixed(2) : "N/A"}
                         </span>
                         <Button
                           variant="secondary"
@@ -1443,9 +1443,9 @@ export default function TechreviveWithAdmin() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Prices</SelectItem>
-                <SelectItem value="0-50000">₹0 - ₹50000</SelectItem>
-                <SelectItem value="50000-100000">₹50000 - ₹100000</SelectItem>
-                <SelectItem value="100000+">₹100000+</SelectItem>
+                <SelectItem value="0-50000">$0 - $50000</SelectItem>
+                <SelectItem value="50000-100000">$50000 - $100000</SelectItem>
+                <SelectItem value="100000+">$100000+</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1481,7 +1481,7 @@ export default function TechreviveWithAdmin() {
                     {product.name}
                   </h4>
                   <div className="flex flex-col items-end">
-                    <span className="text-xs text-white/40 line-through">₹{(product.price * 1.5).toFixed(2)}</span>
+                    <span className="text-xs text-white/40 line-through">${(product.price * 1.5).toFixed(2)}</span>
                     <span className="text-xs font-bold text-pink-500">-33% OFF</span>
                   </div>
                 </div>
@@ -1494,7 +1494,7 @@ export default function TechreviveWithAdmin() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-bold text-green-400">
-                    ₹{product.price ? product.price.toFixed(2) : "N/A"}
+                    ${product.price ? product.price.toFixed(2) : "N/A"}
                   </span>
                   <Button
                     variant="secondary"
@@ -1970,13 +1970,13 @@ export default function TechreviveWithAdmin() {
                   <span>
                     {item.name} x {item.quantity}
                   </span>
-                  <span>₹{(item.price * item.quantity).toFixed(2)}</span>
+                  <span>${(item.price * item.quantity).toFixed(2)}</span>
                 </div>
               ))}
               <Separator />
               <div className="flex justify-between items-center font-bold">
                 <span>Total</span>
-                <span>₹{totalPrice.toFixed(2)}</span>
+                <span>${totalPrice.toFixed(2)}</span>
               </div>
             </div>
             <Button
@@ -2137,14 +2137,25 @@ export default function TechreviveWithAdmin() {
       }
     }, [handleLoadMoreTrending]);
 
-    const handleImportTrending = async (cjId: string) => {
+    const handleImportTrending = async (p: any) => {
+      const cjId = p.cj_id;
+
       setImportingProductId(cjId);
       try {
         const res = await fetch('/api/cj/import', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cjProductId: cjId })
+          body: JSON.stringify({ 
+            cjProductId: cjId,
+            name: p.name,
+            price: p.price,
+            image: p.image,
+            description: p.description,
+            category: p.category,
+            brand: p.brand
+          })
         });
+
         const data = await res.json();
         
         if (data.success) {
@@ -2509,7 +2520,7 @@ export default function TechreviveWithAdmin() {
                                       <span className="text-green-400 font-bold">${p.price}</span>
                                       <Button 
                                         size="sm" 
-                                        onClick={() => handleImportTrending(p.cj_id)} 
+                                        onClick={() => handleImportTrending(p)} 
                                         disabled={importingProductId === p.cj_id}
                                         className="bg-indigo-500 hover:bg-indigo-600 h-8 px-4 text-xs font-bold"
                                       >
@@ -2662,7 +2673,7 @@ export default function TechreviveWithAdmin() {
                             <TableCell>{order.customerName || "N/A"}</TableCell>
                             <TableCell>{order.address || "N/A"}</TableCell>
                             <TableCell>
-                              ₹{order.total?.toFixed(2) || "0.00"}
+                              ${order.total?.toFixed(2) || "0.00"}
                             </TableCell>
                             <TableCell>
                               <span
@@ -2966,7 +2977,7 @@ export default function TechreviveWithAdmin() {
                     {order.address}
                   </p>
                   <p>
-                    <span className="text-gray-400">Total Amount:</span> ₹
+                    <span className="text-gray-400">Total Amount:</span> $
                     {order.total.toFixed(2)}
                   </p>
                 </div>
@@ -2981,7 +2992,7 @@ export default function TechreviveWithAdmin() {
                       <span>
                         {item.name} x {item.quantity}
                       </span>
-                      <span>₹{(item.price * item.quantity).toFixed(2)}</span>
+                      <span>${(item.price * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>

@@ -1,9 +1,7 @@
 "use client";
 import dynamic from 'next/dynamic';
-import { LaptopButton } from "@/components/LaptopButton"; // Adjusted the import path
-import { LaptopDetails } from "@/components/LaptopDetails";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+
 
 export default function Page() {
   const laptop = { /* define your laptop object here */ };
@@ -24,15 +22,7 @@ export default function Page() {
   return (
     <>
       <TechreviveWithAdmin />
-      {typeof window !== "undefined" && (
-        <Router>
-          <h1></h1>
-          <LaptopButton laptop={LaptopDetails} />
-          <Routes>
-            <Route path="/laptop-details" element={<LaptopDetails />} />
-          </Routes>
-        </Router>
-      )}
     </>
   );
 };
+
