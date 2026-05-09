@@ -265,21 +265,28 @@ export default function TechreviveWithAdmin() {
         const result = await firebaseSignInWithPopup(auth, provider);
         const user = result.user;
 
-        // Check if the user already exists in your database
+        const db = getFirestore();
         const userRef = doc(db, "users", user.uid);
         const userDoc = await getDoc(userRef);
 
+        let role = "user";
         if (!userDoc.exists()) {
-          // If the user doesn't exist, create a new user document with the "user" role
           await setDoc(userRef, {
             name: user.displayName ?? "",
             email: user.email ?? "",
             role: "user",
             createdAt: new Date(),
           });
+        } else {
+          role = userDoc.data()?.role || "user";
         }
 
+        const userWithRole = { ...user, role };
+        setCurrentUser(userWithRole);
+        localStorage.setItem("user", JSON.stringify(userWithRole));
+
         setError(null);
+        setIsAuthOpen(false);
       } catch (error) {
         console.error("Error signing up:", error);
         setError("Failed to sign up with Google. Please try again.");
@@ -313,8 +320,13 @@ export default function TechreviveWithAdmin() {
             name: name,
             email: email,
             phone: phone,
+            role: "user",
             createdAt: new Date(),
           });
+
+          const userWithRole = { ...userCredential.user, role: "user" };
+          setCurrentUser(userWithRole);
+          localStorage.setItem("user", JSON.stringify(userWithRole));
 
           console.log(
             "User signed up and added to Firestore successfully:",
@@ -346,21 +358,30 @@ export default function TechreviveWithAdmin() {
       try {
         const auth = firebaseGetAuth();
         const result = await firebaseSignInWithPopup(auth, provider);
-        // This gives you a Google Access Token. You can use it to access the Google API.
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        const token = credential?.accessToken;
-        // The signed-in user info.
         const user = result.user;
-        setError(null);
-        // Fetch the user document to get the role
+
         const db = getFirestore();
         const userDocRef = doc(db, "users", user.uid);
         const userDocSnapshot = await getDoc(userDocRef);
-        const userData = userDocSnapshot.data();
-        const userWithRole = { ...user, role: userData?.role || "user" };
+        
+        let role = "user";
+        if (!userDocSnapshot.exists()) {
+          await setDoc(userDocRef, {
+            name: user.displayName ?? "",
+            email: user.email ?? "",
+            role: "user",
+            createdAt: new Date(),
+          });
+        } else {
+          role = userDocSnapshot.data()?.role || "user";
+        }
+        
+        const userWithRole = { ...user, role };
         setCurrentUser(userWithRole);
         localStorage.setItem("user", JSON.stringify(userWithRole));
-        // You can add additional logic here, such as updating UI or redirecting the user
+        
+        setError(null);
+        setIsAuthOpen(false);
       } catch (error) {
         console.error("Error signing in with Google:", error);
         setError("Failed to sign in with Google. Please try again.");
@@ -395,10 +416,20 @@ export default function TechreviveWithAdmin() {
           password
         );
         const user = userCredential.user;
+
+        const db = getFirestore();
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnapshot = await getDoc(userDocRef);
+        const userData = userDocSnapshot.data();
+        const role = userData?.role || "user";
+
+        const userWithRole = { ...user, role };
+        setCurrentUser(userWithRole);
+        localStorage.setItem("user", JSON.stringify(userWithRole));
+
         console.log("User signed in:", user);
         setError(null);
         setIsAuthOpen(false);
-        // You can add additional logic here, such as updating UI or redirecting the user
       } catch (error) {
         console.error("Error signing in:", error);
         setError("Failed to sign in. Please check your email and password.");
@@ -651,6 +682,8 @@ export default function TechreviveWithAdmin() {
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px] bg-black/80 backdrop-blur-xl text-white border border-white/20">
+                <DialogTitle className="sr-only">Authentication</DialogTitle>
+                <DialogDescription className="sr-only">Login or Sign up</DialogDescription>
                 {!currentUser ? (
                   <Tabs defaultValue="login" className="w-full">
                     <Separator className="my-4 bg-transparent" />
@@ -680,8 +713,7 @@ export default function TechreviveWithAdmin() {
                       <form
                         onSubmit={(e) => {
                           e.preventDefault();
-                          // Handle login logic here
-                          setIsAuthOpen(false);
+                          handleSignIn();
                         }}
                       >
                         <div className="grid gap-4 py-4">
@@ -728,7 +760,6 @@ export default function TechreviveWithAdmin() {
                           <Button
                             type="submit"
                             className="bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
-                            onClick={handleSignIn}
                           >
                             Login
                           </Button>
@@ -872,7 +903,6 @@ export default function TechreviveWithAdmin() {
                           <Button
                             type="submit"
                             className="bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 hover:from-green-500 hover:via-blue-600 hover:to-purple-700 text-white"
-                            onClick={handleSignIn}
                           >
                             Sign Up
                           </Button>
