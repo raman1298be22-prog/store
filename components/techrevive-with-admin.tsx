@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -2098,15 +2098,17 @@ export default function TechreviveWithAdmin() {
     const [isTrendingLoading, setIsTrendingLoading] = useState(false);
     const [isTrendingDialogOpen, setIsTrendingDialogOpen] = useState(false);
     const [importingProductId, setImportingProductId] = useState<string | null>(null);
+    const [visibleTrendingCount, setVisibleTrendingCount] = useState(20);
 
-    const fetchTrending = async () => {
+    const fetchTrending = async (isChange = false) => {
+      if (!isChange) setIsTrendingDialogOpen(true);
       setIsTrendingLoading(true);
-      setIsTrendingDialogOpen(true);
       try {
         const res = await fetch('/api/cj/trending');
         const data = await res.json();
         if (data.success) {
           setTrendingProducts(data.products);
+          setVisibleTrendingCount(20); // Reset count on new fetch
         }
       } catch (err) {
         console.error("Error fetching trending:", err);
@@ -2114,6 +2116,26 @@ export default function TechreviveWithAdmin() {
         setIsTrendingLoading(false);
       }
     };
+
+    const handleLoadMoreTrending = useCallback(() => {
+      setVisibleTrendingCount(prev => Math.min(prev + 10, trendingProducts.length));
+    }, [trendingProducts.length]);
+
+    const observer = useRef<IntersectionObserver | null>(null);
+    const sentinelRef = useCallback((node: HTMLDivElement | null) => {
+      if (observer.current) observer.current.disconnect();
+      if (node) {
+        observer.current = new IntersectionObserver(
+          (entries) => {
+            if (entries[0].isIntersecting) {
+              handleLoadMoreTrending();
+            }
+          },
+          { threshold: 0.1 }
+        );
+        observer.current.observe(node);
+      }
+    }, [handleLoadMoreTrending]);
 
     const handleImportTrending = async (cjId: string) => {
       setImportingProductId(cjId);
@@ -2299,7 +2321,7 @@ export default function TechreviveWithAdmin() {
                   </h2>
                   <div className="flex space-x-2">
                     <Button
-                      onClick={fetchTrending}
+                      onClick={() => fetchTrending()}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white border-none shadow-[0_0_15px_rgba(79,70,229,0.4)]"
                     >
                       <TrendingUp className="mr-2 h-4 w-4" />
@@ -2448,13 +2470,23 @@ export default function TechreviveWithAdmin() {
                     {/* Trending Products Dialog */}
                     <Dialog open={isTrendingDialogOpen} onOpenChange={setIsTrendingDialogOpen}>
                       <DialogContent className="max-w-4xl bg-black/90 backdrop-blur-2xl text-white border border-white/10 max-h-[80vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-                            Trending High-Sales Products
-                          </DialogTitle>
-                          <DialogDescription className="text-white/60">
-                            Discover the top-performing items on CJ Dropshipping right now.
-                          </DialogDescription>
+                        <DialogHeader className="flex flex-row items-center justify-between">
+                          <div>
+                            <DialogTitle className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+                              Trending High-Sales Products
+                            </DialogTitle>
+                            <DialogDescription className="text-white/60">
+                              Discover the top-performing items on CJ Dropshipping right now.
+                            </DialogDescription>
+                          </div>
+                          <Button 
+                            variant="outline" 
+                            onClick={() => fetchTrending(true)}
+                            className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            Change Products
+                          </Button>
                         </DialogHeader>
                         
                         {isTrendingLoading ? (
@@ -2463,36 +2495,44 @@ export default function TechreviveWithAdmin() {
                             <p className="text-indigo-400 animate-pulse">Analyzing market trends...</p>
                           </div>
                         ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-                            {trendingProducts.map((p) => (
-                              <div key={p.cj_id} className="p-4 bg-white/5 border border-white/10 rounded-xl flex space-x-4 group hover:bg-white/10 transition-all">
-                                <img src={p.image} className="w-24 h-24 object-cover rounded-lg" alt={p.name} />
-                                <div className="flex-1 flex flex-col justify-between">
-                                  <div>
-                                    <h4 className="font-bold text-white mb-1 group-hover:text-indigo-400 transition-colors">{p.name}</h4>
-                                    <p className="text-xs text-white/40 line-clamp-2">{p.description}</p>
-                                  </div>
-                                  <div className="flex justify-between items-center mt-2">
-                                    <span className="text-green-400 font-bold">${p.price}</span>
-                                    <Button 
-                                      size="sm" 
-                                      onClick={() => handleImportTrending(p.cj_id)} 
-                                      disabled={importingProductId === p.cj_id}
-                                      className="bg-indigo-500 hover:bg-indigo-600 h-8 px-4 text-xs font-bold"
-                                    >
-                                      {importingProductId === p.cj_id ? (
-                                        <div className="flex items-center">
-                                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                                          Importing...
-                                        </div>
-                                      ) : (
-                                        "Import Now"
-                                      )}
-                                    </Button>
+                          <div className="mt-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {trendingProducts.slice(0, visibleTrendingCount).map((p) => (
+                                <div key={p.cj_id} className="p-4 bg-white/5 border border-white/10 rounded-xl flex space-x-4 group hover:bg-white/10 transition-all">
+                                  <img src={p.image} className="w-24 h-24 object-cover rounded-lg" alt={p.name} />
+                                  <div className="flex-1 flex flex-col justify-between">
+                                    <div>
+                                      <h4 className="font-bold text-white mb-1 group-hover:text-indigo-400 transition-colors">{p.name}</h4>
+                                      <p className="text-xs text-white/40 line-clamp-2">{p.description}</p>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-2">
+                                      <span className="text-green-400 font-bold">${p.price}</span>
+                                      <Button 
+                                        size="sm" 
+                                        onClick={() => handleImportTrending(p.cj_id)} 
+                                        disabled={importingProductId === p.cj_id}
+                                        className="bg-indigo-500 hover:bg-indigo-600 h-8 px-4 text-xs font-bold"
+                                      >
+                                        {importingProductId === p.cj_id ? (
+                                          <div className="flex items-center">
+                                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                                            Importing...
+                                          </div>
+                                        ) : (
+                                          "Import Now"
+                                        )}
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
+                            {/* Sentinel for IntersectionObserver */}
+                            <div ref={sentinelRef} className="h-10 w-full flex items-center justify-center mt-4">
+                              {visibleTrendingCount < trendingProducts.length && (
+                                <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </DialogContent>
