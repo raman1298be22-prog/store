@@ -83,9 +83,9 @@ import { auth as Auth } from "firebase-admin";
 import { log } from "console";
 const firebaseConfig = {
   apiKey: "AIzaSyDrG6tD6GPC7kCZ3CNXmAhc_X5wXd643-E",
-  authDomain: "product-shop-25c2c.firebaseapp.com",
-  projectId: "product-shop-25c2c",
-  storageBucket: "product-shop-25c2c.firebasestorage.app",
+  authDomain: "laptop-shop-25c2c.firebaseapp.com",
+  projectId: "laptop-shop-25c2c",
+  storageBucket: "laptop-shop-25c2c.firebasestorage.app",
   messagingSenderId: "209150941153",
   appId: "1:209150941153:web:0f6bd22df7e37b5fffa4a0",
   measurementId: "G-0S28KCF6LV",
@@ -1696,15 +1696,20 @@ export default function TechreviveWithAdmin() {
       };
 
       try {
-        // Use setDoc to specify the document ID
-        const orderRef = doc(ordersCollection, newOrder.id.toString()); // Ensure the ID is a string
-        await setDoc(orderRef, newOrder);
-        console.log("Order placed successfully");
+        // Save order to Firestore with auto-generated ID
+        const orderRef = await addDoc(ordersCollection, newOrder);
+        console.log("Order placed successfully, Firestore ID:", orderRef.id);
 
-        // Update stock and sold counts
+        // Update stock and sold counts — look up by firb_id (Firestore doc ID)
         await Promise.all(
           cartItems.map(async (item) => {
-            const productRef = doc(db, "products", item.id.toString());
+            // Find the matching product using the numeric cart item id
+            const matchingProduct = products.find((p) => p.id === item.id);
+            if (!matchingProduct?.firb_id) {
+              console.warn(`No Firestore doc ID for product id=${item.id}, skipping stock update`);
+              return;
+            }
+            const productRef = doc(db, "products", matchingProduct.firb_id);
             const productSnap = await getDoc(productRef);
 
             if (productSnap.exists()) {
@@ -1730,8 +1735,14 @@ export default function TechreviveWithAdmin() {
           return product;
         });
         setProducts(updatedProducts);
-      } catch (error) {
+
+        // Clear cart and show success
+        setCartItems([]);
+        setCurrentPage("home");
+        alert("✅ Order placed successfully! Your order is being processed.");
+      } catch (error: any) {
         console.error("Error adding order: ", error);
+        alert(`❌ Order failed: ${error.message || "Could not save order to Firestore"}`);
       }
 
       setCustomerName("");
@@ -1753,8 +1764,18 @@ export default function TechreviveWithAdmin() {
           try {
             const { latitude, longitude } = position.coords;
             const response = await fetch(
-              `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=bf51ba192eef4f9ba8fe27c54ddedb65`
+              `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=1ae59703ee7c4de384485c912df09348`
             );
+            
+            if (!response.ok) {
+              if (response.status === 401) {
+                console.warn("OpenCage Geocoding API: Unauthorized (Check your API Key)");
+              } else {
+                console.error(`OpenCage Geocoding API Error: ${response.status}`);
+              }
+              return;
+            }
+
             const data = await response.json();
             const result = data.results[0];
 
@@ -1999,16 +2020,24 @@ export default function TechreviveWithAdmin() {
         const data = await res.json();
         
         if (data.success) {
-          const newProduct: Product = { ...data.product, firb_id: "", id: products.length + 1 };
+          const newId = products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1;
+          const newProduct: Product = { ...data.product, firb_id: "", id: newId };
           const docRef = await addDoc(collection(db, "products"), newProduct);
-          setProducts([...products, { ...newProduct, firb_id: docRef.id }]);
+          const finalProduct = { ...newProduct, firb_id: docRef.id };
+          
+          setProducts(prev => [...prev, finalProduct]);
+          setFilteredProducts(prev => [...prev, finalProduct]);
+          setOriginalProducts(prev => [...prev, finalProduct]);
+          
           setIsAdminDialogOpen(false);
+          alert(`Imported: ${data.product.name}`);
         } else {
           console.error("Failed to scalp product from CJ:", data.error);
           alert("Failed to scalp product from CJ Dropshipping.");
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error importing product: ", error);
+        alert(`Persistence Error: ${error.message || "Could not save to Firestore"}`);
       }
     };
 

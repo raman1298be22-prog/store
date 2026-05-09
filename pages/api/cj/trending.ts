@@ -1,10 +1,71 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+const firebaseConfig = {
+  apiKey: "AIzaSyDrG6tD6GPC7kCZ3CNXmAhc_X5wXd643-E",
+  authDomain: "laptop-shop-25c2c.firebaseapp.com",
+  projectId: "laptop-shop-25c2c",
+  storageBucket: "laptop-shop-25c2c.firebasestorage.app",
+  messagingSenderId: "209150941153",
+  appId: "1:209150941153:web:0f6bd22df7e37b5fffa4a0",
+  measurementId: "G-0S28KCF6LV",
+};
+
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const db = getFirestore(app);
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
+    // If ?diag=true, run the diagnostic instead of the trending list
+    if (req.query.diag === 'true') {
+      const results: Record<string, any> = {
+        project: firebaseConfig.projectId,
+        timestamp: new Date().toISOString(),
+        collections: {} as Record<string, any>,
+        writeTest: {} as Record<string, any>,
+      };
+
+      const collectionNames = ['products', 'orders', 'users', 'laptops'];
+      for (const name of collectionNames) {
+        try {
+          const snapshot = await getDocs(collection(db, name));
+          results.collections[name] = {
+            status: 'READ_OK',
+            count: snapshot.size,
+            sampleIds: snapshot.docs.slice(0, 3).map(d => d.id),
+          };
+        } catch (error: any) {
+          results.collections[name] = { status: 'READ_FAILED', error: error.message, code: error.code };
+        }
+      }
+
+      // Write test to products
+      try {
+        const docRef = await addDoc(collection(db, "products"), { name: "__TEST__", _test: true });
+        results.writeTest.products = { status: 'WRITE_OK', docId: docRef.id };
+        await deleteDoc(doc(db, "products", docRef.id));
+        results.writeTest.products.cleanup = 'DELETED';
+      } catch (error: any) {
+        results.writeTest.products = { status: 'WRITE_FAILED', error: error.message, code: error.code };
+      }
+
+      // Write test to orders
+      try {
+        const docRef = await addDoc(collection(db, "orders"), { name: "__TEST__", _test: true });
+        results.writeTest.orders = { status: 'WRITE_OK', docId: docRef.id };
+        await deleteDoc(doc(db, "orders", docRef.id));
+        results.writeTest.orders.cleanup = 'DELETED';
+      } catch (error: any) {
+        results.writeTest.orders = { status: 'WRITE_FAILED', error: error.message, code: error.code };
+      }
+
+      return res.status(200).json(results);
+    }
+
+    // Normal trending product list
     try {
       const allListableProducts = [
-        // Pet Supplies
         {
           cj_id: "CJ_PET_001",
           name: "Self-Cleaning Waterproof Pet Brush",
@@ -21,7 +82,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
           description: "Keep your feline active and healthy with this smart laser toy.",
           category: "Pet Supplies"
         },
-        // Tech & Gadgets
         {
           cj_id: "CJ_TECH_001",
           name: "Wireless Magnetic 3-in-1 Charging Station",
@@ -46,7 +106,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
           description: "Create a golden hour atmosphere with 16 color modes.",
           category: "Home Decor"
         },
-        // Health & Beauty
         {
           cj_id: "CJ_BEAUTY_001",
           name: "Electric Ultrasonic Face Cleanser",
@@ -63,7 +122,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
           description: "Gentle exfoliation and hair removal without razor burns.",
           category: "Health & Beauty"
         },
-        // Kitchen & Home
         {
           cj_id: "CJ_HOME_001",
           name: "Multi-Function Vegetable Chopper",
