@@ -154,19 +154,23 @@ export default function TechreviveWithAdmin() {
   useEffect(() => {
     const initializeCurrency = async () => {
       const rates = await fetchExchangeRates();
-      const location = await getUserLocation();
-      const detectedCountry = location.country;
-      console.log('Detected location:', location, 'Country code:', detectedCountry);
+      const detailedLocation = await getDetailedLocation();
+      let detectedCountry = detailedLocation.country;
 
+      if (!detectedCountry) {
+        const location = await getUserLocation();
+        detectedCountry = location.country || "US";
+      }
+
+      console.log('Detected country for currency:', detectedCountry);
       const savedCurrency = localStorage.getItem("selectedCurrency");
-      let countryCode = detectedCountry; // Always use detected location
+      let countryCode = detectedCountry;
 
-      // If we have a saved currency and it's different from detected, use detected
       if (savedCurrency && savedCurrency !== detectedCountry) {
-        console.log('Saved currency', savedCurrency, 'differs from detected', detectedCountry, '- using detected');
+        console.log('Saved currency differs from detected country, updating to detected:', detectedCountry);
         localStorage.setItem("selectedCurrency", detectedCountry);
       } else if (!savedCurrency) {
-        console.log('No saved currency, saving detected:', detectedCountry);
+        console.log('Saving detected country as selected currency:', detectedCountry);
         localStorage.setItem("selectedCurrency", detectedCountry);
       } else {
         console.log('Using saved currency:', savedCurrency);
@@ -176,17 +180,14 @@ export default function TechreviveWithAdmin() {
       const mapping = CURRENCY_MAPPING[countryCode] || CURRENCY_MAPPING["US"];
       console.log('Currency mapping for', countryCode, ':', mapping);
       const rate = rates[mapping.code] || 1;
-      console.log('Exchange rate for', mapping.code, ':', rate);
       setCurrencyData({ ...mapping, rate });
       setSelectedCountry(countryCode);
 
-      // Fetch detailed location for display
-      const details = await getDetailedLocation();
       setLocationDetails({
-        city: details.city,
-        state: details.state,
-        postalCode: details.postalCode,
-        formatted: details.formatted
+        city: detailedLocation.city,
+        state: detailedLocation.state,
+        postalCode: detailedLocation.postalCode,
+        formatted: detailedLocation.formatted
       });
     };
     initializeCurrency();
@@ -194,23 +195,28 @@ export default function TechreviveWithAdmin() {
 
   const handleDetectLocation = async () => {
     const rates = await fetchExchangeRates();
-    const location = await getUserLocation();
-    console.log('Manual location detection:', location);
-    const mapping = CURRENCY_MAPPING[location.country] || CURRENCY_MAPPING["US"];
+    const detailedLocation = await getDetailedLocation();
+    let countryCode = detailedLocation.country || "US";
+
+    if (!countryCode) {
+      const location = await getUserLocation();
+      countryCode = location.country || "US";
+    }
+
+    console.log('Manual detected country:', countryCode);
+    const mapping = CURRENCY_MAPPING[countryCode] || CURRENCY_MAPPING["US"];
     console.log('Manual currency mapping:', mapping);
     const rate = rates[mapping.code] || 1;
     console.log('Manual exchange rate:', rate);
     setCurrencyData({ ...mapping, rate });
-    setSelectedCountry(location.country);
-    localStorage.setItem("selectedCurrency", location.country);
+    setSelectedCountry(countryCode);
+    localStorage.setItem("selectedCurrency", countryCode);
 
-    // Update location details
-    const details = await getDetailedLocation();
     setLocationDetails({
-      city: details.city,
-      state: details.state,
-      postalCode: details.postalCode,
-      formatted: details.formatted
+      city: detailedLocation.city,
+      state: detailedLocation.state,
+      postalCode: detailedLocation.postalCode,
+      formatted: detailedLocation.formatted
     });
   };
 
